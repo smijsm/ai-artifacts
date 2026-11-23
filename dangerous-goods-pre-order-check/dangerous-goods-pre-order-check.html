@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dangerous goods pre-order check</title>
+<style>
+/* Layout idea: a working tool. Form on the left (product, then route), the tailored result on the right:
+   sign plate with the count, what to settle first, checklist in four groups, costs and deadlines, supplier message.
+   Identity: hazard signage. Ink on off-white, one signal-yellow accent for "needs your attention". */
+:root{
+  color-scheme:light;
+  --bg:#fcfcfb; --panel:#f1f0ec; --ink:#0b0b0b; --ink-2:#52514e; --line:#dddcd6; --mute:#8f8e87;
+  --accent:#ffcb1f; --on-accent:#0b0b0b; --stripe:#0b0b0b;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono","Cascadia Mono",Menlo,Consolas,monospace;
+  --r:12px;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#1a1a19; --panel:#262624; --ink:#f0efec; --ink-2:#c3c2b7; --line:#3b3b38; --mute:#7b7a73;
+    --accent:#ffcb1f; --on-accent:#0b0b0b; --stripe:#0b0b0b;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#1a1a19; --panel:#262624; --ink:#f0efec; --ink-2:#c3c2b7; --line:#3b3b38; --mute:#7b7a73;
+  --accent:#ffcb1f; --on-accent:#0b0b0b; --stripe:#0b0b0b;
+}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+[hidden]{display:none!important}
+.wrap{max-width:1240px;margin:0 auto;padding-inline:clamp(16px,4vw,40px)}
+h1,h2,h3,p{margin:0}
+h1,h2,h3{text-wrap:balance}
+button{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+a{color:inherit;text-decoration:underline;text-underline-offset:2px}
+.label{font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-2);font-weight:600}
+.mono{font-family:var(--mono);font-size:.94em}
+
+.stripe{height:8px;background:repeating-linear-gradient(-45deg,var(--stripe) 0 12px,var(--accent) 12px 24px)}
+header .wrap{padding-block:32px 4px}
+h1{font-size:clamp(26px,3.6vw,38px);line-height:1.1;font-weight:700;letter-spacing:-.02em}
+.lead{font-size:17px;color:var(--ink-2);max-width:66ch;margin-top:10px}
+h2{font-size:20px;line-height:1.2;font-weight:700;letter-spacing:-.01em}
+h3{font-size:16px;font-weight:700}
+
+.layout{display:grid;grid-template-columns:minmax(0,430px) minmax(0,1fr);gap:44px;align-items:start;padding-block:26px 44px}
+.form-col{display:grid;gap:18px}
+.card{border:1px solid var(--line);border-radius:var(--r);padding:20px;display:grid;gap:18px;background:var(--bg)}
+.note{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between;background:var(--panel);border-radius:var(--r);padding:12px 16px;font-size:14px}
+.field{display:grid;gap:6px;min-width:0}
+.field>label,.field>.lbl{font-weight:600;font-size:14px}
+.hint{font-size:13px;color:var(--ink-2)}
+.warn{font-size:13px;font-weight:600}
+input[type=text],input[type=number],select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--mute);border-radius:8px;padding:8px 11px;min-height:42px;width:100%}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:12px}
+.row.un{grid-template-columns:minmax(0,1fr) minmax(0,1.9fr) minmax(0,.95fr)}
+fieldset{border:0;margin:0;padding:0;min-width:0}
+legend{padding:0;margin-bottom:6px;font-weight:600;font-size:14px}
+.seg{display:flex;flex-wrap:wrap;gap:6px;position:relative}
+.seg input{position:absolute;opacity:0;width:1px;height:1px;margin:0;pointer-events:none}
+.seg label{display:inline-flex;align-items:center;min-height:38px;padding:6px 13px;border:1px solid var(--line);border-radius:999px;cursor:pointer;background:var(--bg);font-size:14px;transition:background .12s,border-color .12s,color .12s}
+.seg label:hover{border-color:var(--ink-2)}
+.seg input:checked+label{background:var(--ink);color:var(--bg);border-color:var(--ink);font-weight:600}
+.seg input:focus-visible+label{outline:3px solid var(--ink);outline-offset:3px}
+.presets{display:flex;flex-wrap:wrap;gap:6px}
+.btn{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:6px 13px;font-size:14px;cursor:pointer;min-height:36px}
+.btn:hover{border-color:var(--ink-2)}
+.btn.solid{background:var(--ink);color:var(--bg);border-color:var(--ink);font-weight:600}
+.checks{display:grid;gap:8px}
+.checks label{display:grid;grid-template-columns:22px minmax(0,1fr);gap:10px;align-items:start;font-size:14px;cursor:pointer}
+.checks input,.item input{width:20px;height:20px;margin:1px 0 0;accent-color:var(--accent);cursor:pointer}
+summary{cursor:pointer;font-weight:600}
+details .checks{margin-top:12px}
+
+/* Result */
+.result{display:grid;gap:26px;min-width:0}
+.top{display:grid;grid-template-columns:auto minmax(0,1fr);gap:22px 28px;align-items:center}
+.plate{background:var(--accent);color:var(--on-accent);border:3px solid var(--stripe);border-radius:18px;padding:12px 22px 10px;display:grid;justify-items:center;gap:2px;min-width:150px}
+.plate-n{font-size:clamp(46px,6vw,64px);line-height:1;font-weight:700;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.plate-l{font-size:12px;letter-spacing:.07em;text-transform:uppercase;font-weight:700;text-align:center}
+.recap-line{font-size:18px;line-height:1.35;font-weight:600;text-wrap:pretty}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.chip{border:1px solid var(--line);border-radius:6px;padding:3px 9px;font-size:13px;background:var(--bg)}
+.chip b{font-weight:700}
+.progress{font-size:13px;color:var(--ink-2);margin-top:8px}
+.cover{margin:0;border-left:5px solid var(--ink);background:var(--panel);border-radius:0 var(--r) var(--r) 0;padding:12px 16px;font-size:14px}
+.first{border-left:5px solid var(--accent);background:var(--panel);border-radius:0 var(--r) var(--r) 0;padding:16px 18px;display:grid;gap:4px}
+.first .item:first-of-type{border-top:0}
+.group{display:grid;gap:2px}
+.group-head{display:flex;gap:10px;align-items:baseline;justify-content:space-between;padding-bottom:6px;border-bottom:2px solid var(--ink)}
+.group-n{font-size:13px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.item{display:grid;grid-template-columns:22px minmax(0,1fr);gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+.group .item:first-of-type{border-top:0}
+.item-t{font-weight:650;cursor:pointer}
+.item-d{color:var(--ink-2);font-size:14px;margin-top:2px;max-width:70ch}
+.item-m{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;margin-top:7px;font-size:13px}
+.who{border:1px solid var(--line);border-radius:999px;padding:1px 9px;color:var(--ink-2);background:var(--bg)}
+.item.done .item-t{text-decoration:line-through;text-decoration-color:var(--mute);color:var(--ink-2)}
+.empty{color:var(--ink-2);padding:10px 0;font-size:14px}
+.skipped ul{margin:10px 0 0;padding-left:18px;display:grid;gap:4px;color:var(--ink-2);font-size:14px}
+.est{display:grid;gap:14px}
+.est-head{display:flex;gap:10px;align-items:center;justify-content:space-between}
+.tag{font-size:12px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;border:1px solid var(--ink);border-radius:6px;padding:1px 7px}
+.est dl{margin:0;display:grid;gap:0}
+.est dl>div{display:grid;grid-template-columns:minmax(0,180px) minmax(0,1fr);gap:4px 18px;padding:10px 0;border-top:1px solid var(--line)}
+.est dt{font-weight:650}
+.est dd{margin:0}
+.est dd small{display:block;color:var(--ink-2);font-size:13px;margin-top:2px}
+.msg{white-space:pre-wrap;background:var(--panel);border-radius:var(--r);padding:16px 18px;font-size:14px;margin-top:4px;overflow-wrap:anywhere}
+.actions{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.status{font-size:13px;color:var(--ink-2)}
+.recap{display:none}
+.jump{display:none;position:sticky;bottom:12px;justify-self:center;background:var(--accent);color:var(--on-accent);border:2px solid var(--stripe);border-radius:999px;padding:9px 18px;font-weight:600;text-decoration:none;z-index:3}
+.jump b{font-weight:700}
+
+footer .wrap{padding-block:20px 44px;border-top:1px solid var(--line);font-size:13px;color:var(--ink-2);display:grid;gap:12px}
+footer p{max-width:100ch}
+footer ul{margin:10px 0 0;padding-left:18px;display:grid;gap:4px}
+
+@media (max-width:1000px){.layout{grid-template-columns:minmax(0,1fr);gap:30px}.jump{display:inline-block}}
+@media (max-width:520px){.top{grid-template-columns:minmax(0,1fr)}.plate{justify-self:start}.est dl>div{grid-template-columns:minmax(0,1fr)}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+@media print{
+  :root{--bg:#ffffff;--panel:#f2f2f2;--ink:#000000;--ink-2:#333333;--line:#bbbbbb;--mute:#888888}
+  body{font-size:10.5pt}
+  .stripe,.form-col,.btn,.noprint,.actions{display:none!important}
+  header .wrap{padding-block:0 4px}
+  .lead{display:none}
+  .layout{display:block;padding-block:10px 0}
+  .result{gap:16px}
+  .recap{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px 24px;margin:0;font-size:9.5pt}
+  .recap div{display:flex;gap:8px}.recap dt{font-weight:700}.recap dd{margin:0}
+  .item,.first,.est dl>div,.group-head{break-inside:avoid}
+  .group-head{break-after:avoid}
+  .skipped[open] summary,.skipped:not([open]){display:none}
+  a{text-decoration:none}
+}
+</style>
+</head>
+<body>
+
+<div class="stripe" aria-hidden="true"></div>
+
+<header>
+  <div class="wrap">
+    <h1>Dangerous goods: pre-order check</h1>
+    <p class="lead">Enter what you know about the product and the route. You get the list of what to settle before you order, tailored to those entries. Any route works: local rules are built in for 42 countries, and every other destination gets the general checks.</p>
+  </div>
+</header>
+
+<main class="wrap layout">
+
+  <div class="form-col" id="form">
+    <div class="note"><span id="note-text">Example values are filled in. Replace them with your own.</span><button class="btn" type="button" id="btn-clear">Clear form</button></div>
+
+    <section class="card" aria-labelledby="h-product">
+      <h2 id="h-product">1 Product</h2>
+
+      <div class="field">
+        <label for="f-name">Product name</label>
+        <input type="text" id="f-name" name="name" autocomplete="off">
+      </div>
+
+      <fieldset>
+        <legend>Kind of product</legend>
+        <div class="seg">
+          <input type="radio" name="kind" id="k-chem" value="chem"><label for="k-chem">Chemical product</label>
+          <input type="radio" name="kind" id="k-batt" value="batt"><label for="k-batt">Lithium battery</label>
+          <input type="radio" name="kind" id="k-device" value="device"><label for="k-device">Device with lithium battery</label>
+        </div>
+      </fieldset>
+
+      <div class="field" data-show="chem">
+        <span class="lbl">Start from a typical product</span>
+        <div class="presets">
+          <button class="btn" type="button" data-preset="spray">Spray can</button>
+          <button class="btn" type="button" data-preset="paint">Paint</button>
+          <button class="btn" type="button" data-preset="adhesive">Adhesive</button>
+          <button class="btn" type="button" data-preset="solvent">Solvent</button>
+          <button class="btn" type="button" data-preset="cleaner">Cleaner, not regulated</button>
+        </div>
+        <span class="hint">Typical values only. The safety data sheet of your product decides.</span>
+      </div>
+
+      <fieldset data-show="chem">
+        <legend>Do you have the safety data sheet?</legend>
+        <div class="seg">
+          <input type="radio" name="sds" id="s-yes" value="yes"><label for="s-yes">Yes</label>
+          <input type="radio" name="sds" id="s-no" value="no"><label for="s-no">Not yet</label>
+        </div>
+      </fieldset>
+
+      <fieldset data-show="chem">
+        <legend>Dangerous goods in transport? (section 14)</legend>
+        <div class="seg">
+          <input type="radio" name="dg" id="d-yes" value="yes"><label for="d-yes">Yes</label>
+          <input type="radio" name="dg" id="d-no" value="no"><label for="d-no">No, not regulated</label>
+          <input type="radio" name="dg" id="d-unknown" value="unknown"><label for="d-unknown">Don't know</label>
+        </div>
+      </fieldset>
+
+      <div class="row un" data-show="chem-dg">
+        <div class="field">
+          <label for="f-un">UN number</label>
+          <input type="text" id="f-un" name="un" inputmode="numeric" maxlength="4" placeholder="4 digits" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="f-cls">Class</label>
+          <select id="f-cls" name="cls">
+            <option value="">Choose</option>
+            <option value="1">1 Explosives</option>
+            <option value="2.1">2.1 Flammable gas</option>
+            <option value="2.2">2.2 Non-flammable gas</option>
+            <option value="2.3">2.3 Toxic gas</option>
+            <option value="3">3 Flammable liquid</option>
+            <option value="4.1">4.1 Flammable solid</option>
+            <option value="4.2">4.2 Self-igniting</option>
+            <option value="4.3">4.3 Dangerous when wet</option>
+            <option value="5.1">5.1 Oxidiser</option>
+            <option value="5.2">5.2 Organic peroxide</option>
+            <option value="6.1">6.1 Toxic</option>
+            <option value="6.2">6.2 Infectious</option>
+            <option value="7">7 Radioactive</option>
+            <option value="8">8 Corrosive</option>
+            <option value="9">9 Miscellaneous</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f-pg">Packing group</label>
+          <select id="f-pg" name="pg">
+            <option value="">None</option>
+            <option value="I">I</option>
+            <option value="II">II</option>
+            <option value="III">III</option>
+          </select>
+        </div>
+      </div>
+      <p class="warn" id="un-warn" hidden>A UN number has four digits, for example 1263.</p>
+
+      <div class="row" data-show="chem-dg">
+        <div class="field">
+          <label for="f-lq">Limited-quantity limit</label>
+          <input type="number" id="f-lq" name="lq" min="0" step="any" placeholder="e.g. 5">
+        </div>
+        <div class="field">
+          <label for="f-inner">Size of one pack</label>
+          <input type="number" id="f-inner" name="inner" min="0" step="any" placeholder="e.g. 1">
+        </div>
+        <div class="field">
+          <label for="f-unit">Unit</label>
+          <select id="f-unit" name="unit"><option value="L">L</option><option value="kg">kg</option></select>
+        </div>
+      </div>
+      <span class="hint" data-show="chem-dg">The limit is listed per UN number, often in section 14 as LQ. Enter 0 if limited quantities are not allowed. Leave empty if you don't know it.</span>
+
+      <fieldset data-show="lith">
+        <legend>Battery type</legend>
+        <div class="seg">
+          <input type="radio" name="chem" id="b-ion" value="ion"><label for="b-ion">Lithium-ion, rechargeable</label>
+          <input type="radio" name="chem" id="b-metal" value="metal"><label for="b-metal">Lithium-metal</label>
+        </div>
+      </fieldset>
+
+      <fieldset data-show="device">
+        <legend>How is the battery shipped?</legend>
+        <div class="seg">
+          <input type="radio" name="fit" id="fit-with" value="with"><label for="fit-with">Packed with the device</label>
+          <input type="radio" name="fit" id="fit-in" value="in"><label for="fit-in">Built into the device</label>
+        </div>
+      </fieldset>
+
+      <div class="field" data-show="lith">
+        <label for="f-wh" id="wh-label">Watt-hours per battery</label>
+        <input type="number" id="f-wh" name="wh" min="0" step="any" placeholder="e.g. 90">
+        <span class="hint" id="wh-hint">Printed on the battery. Volts times amp-hours gives watt-hours.</span>
+      </div>
+
+      <fieldset data-show="chem">
+        <legend>Hazard pictograms on the label?</legend>
+        <div class="seg">
+          <input type="radio" name="haz" id="h-yes" value="yes"><label for="h-yes">Yes</label>
+          <input type="radio" name="haz" id="h-no" value="no"><label for="h-no">No</label>
+          <input type="radio" name="haz" id="h-unknown" value="unknown"><label for="h-unknown">Don't know</label>
+        </div>
+      </fieldset>
+
+      <fieldset data-show="chem">
+        <legend>Yearly quantity from this supplier</legend>
+        <div class="seg">
+          <input type="radio" name="annual" id="a-lt" value="lt"><label for="a-lt">Under 1 tonne</label>
+          <input type="radio" name="annual" id="a-ge" value="ge"><label for="a-ge">1 tonne or more</label>
+          <input type="radio" name="annual" id="a-unknown" value="unknown"><label for="a-unknown">Don't know</label>
+        </div>
+      </fieldset>
+
+      <div class="field">
+        <label for="f-hs">Customs tariff code</label>
+        <input type="text" id="f-hs" name="hs" inputmode="numeric" maxlength="13" placeholder="6 to 10 digits, optional" autocomplete="off">
+      </div>
+
+      <details data-show="chem">
+        <summary>More details</summary>
+        <div class="checks">
+          <label for="x-marine"><input type="checkbox" id="x-marine" name="marine"><span>Environmentally hazardous or marine pollutant (section 14)</span></label>
+          <label for="x-biocide"><input type="checkbox" id="x-biocide" name="biocide"><span>Biocidal product, such as a disinfectant or preservative</span></label>
+          <label for="x-precursor"><input type="checkbox" id="x-precursor" name="precursor"><span>Contains a regulated explosives precursor, such as concentrated hydrogen peroxide, nitric acid or sulphuric acid</span></label>
+        </div>
+      </details>
+    </section>
+
+    <section class="card" aria-labelledby="h-route">
+      <h2 id="h-route">2 Route</h2>
+
+      <div class="row">
+        <div class="field">
+          <label for="f-origin">Ships from</label>
+          <select id="f-origin" name="origin"></select>
+        </div>
+        <div class="field">
+          <label for="f-dest">Delivered to</label>
+          <select id="f-dest" name="dest"></select>
+        </div>
+      </div>
+
+      <fieldset>
+        <legend>Main transport</legend>
+        <div class="seg">
+          <input type="radio" name="mode" id="m-road" value="road"><label for="m-road">Road</label>
+          <input type="radio" name="mode" id="m-rail" value="rail"><label for="m-rail">Rail</label>
+          <input type="radio" name="mode" id="m-sea" value="sea"><label for="m-sea">Sea</label>
+          <input type="radio" name="mode" id="m-air" value="air"><label for="m-air">Air</label>
+        </div>
+      </fieldset>
+
+      <fieldset data-show="service">
+        <legend>Service</legend>
+        <div class="seg">
+          <input type="radio" name="service" id="sv-freight" value="freight"><label for="sv-freight">Freight forwarder</label>
+          <input type="radio" name="service" id="sv-express" value="express"><label for="sv-express">Parcel or express</label>
+        </div>
+      </fieldset>
+
+      <div class="row" data-show="sea">
+        <div class="field">
+          <label for="f-pol">Port of loading</label>
+          <input type="text" id="f-pol" name="pol" placeholder="e.g. Shanghai" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="f-poe">Port of arrival</label>
+          <input type="text" id="f-poe" name="poe" list="ports" placeholder="e.g. Hamburg" autocomplete="off">
+        </div>
+      </div>
+      <fieldset data-show="sea">
+        <legend>Routing</legend>
+        <div class="seg">
+          <input type="radio" name="tranship" id="t-direct" value="direct"><label for="t-direct">Direct</label>
+          <input type="radio" name="tranship" id="t-via" value="via"><label for="t-via">Changes ship on the way</label>
+          <input type="radio" name="tranship" id="t-unknown" value="unknown"><label for="t-unknown">Don't know</label>
+        </div>
+      </fieldset>
+
+      <div class="row" data-show="air">
+        <div class="field">
+          <label for="f-aol">Airport of departure</label>
+          <input type="text" id="f-aol" name="aol" placeholder="e.g. Shenzhen" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="f-aoe">Airport of arrival</label>
+          <input type="text" id="f-aoe" name="aoe" list="airports" placeholder="e.g. Frankfurt" autocomplete="off">
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="f-term">Delivery term (Incoterm)</label>
+        <select id="f-term" name="term">
+          <option value="">Not agreed yet</option>
+          <option value="EXW">EXW, you collect at the supplier</option>
+          <option value="FCA">FCA, supplier hands over to your carrier</option>
+          <option value="FAS">FAS, alongside the ship</option>
+          <option value="FOB">FOB, on board the ship</option>
+          <option value="CFR">CFR, supplier pays freight to the port</option>
+          <option value="CIF">CIF, freight and insurance to the port</option>
+          <option value="CPT">CPT, supplier pays carriage</option>
+          <option value="CIP">CIP, carriage and insurance paid</option>
+          <option value="DAP">DAP, delivered, you clear import</option>
+          <option value="DPU">DPU, delivered and unloaded</option>
+          <option value="DDP">DDP, delivered, supplier clears import</option>
+        </select>
+      </div>
+
+      <fieldset data-show="border">
+        <legend id="imp-legend">Are you registered as an importer there?</legend>
+        <div class="seg">
+          <input type="radio" name="eori" id="e-yes" value="yes"><label for="e-yes">Yes</label>
+          <input type="radio" name="eori" id="e-no" value="no"><label for="e-no">No</label>
+          <input type="radio" name="eori" id="e-unknown" value="unknown"><label for="e-unknown">Don't know</label>
+        </div>
+        <span class="hint" id="imp-hint">A customs or tax ID for importers.</span>
+      </fieldset>
+
+      <datalist id="ports"><option value="Hamburg"><option value="Bremerhaven"><option value="Wilhelmshaven"><option value="Rotterdam"><option value="Antwerp"><option value="Le Havre"><option value="Marseille"><option value="Genoa"><option value="Trieste"><option value="Koper"><option value="Piraeus"><option value="Valencia"><option value="Barcelona"><option value="Algeciras"><option value="Sines"><option value="Gdansk"><option value="Gothenburg"><option value="Aarhus"><option value="Klaipeda"><option value="Constanta"><option value="Dublin"><option value="Felixstowe"><option value="Southampton"><option value="London Gateway"><option value="Istanbul"><option value="Mersin"><option value="New York"><option value="Savannah"><option value="Houston"><option value="Los Angeles"><option value="Long Beach"><option value="Vancouver"><option value="Montreal"><option value="Manzanillo"><option value="Veracruz"><option value="Santos"><option value="Shanghai"><option value="Ningbo"><option value="Shenzhen"><option value="Qingdao"><option value="Tianjin"><option value="Hong Kong"><option value="Singapore"><option value="Busan"><option value="Tokyo"><option value="Yokohama"><option value="Kobe"><option value="Nhava Sheva"><option value="Mundra"><option value="Chennai"><option value="Sydney"><option value="Melbourne"><option value="Jebel Ali"><option value="Durban"></datalist>
+      <datalist id="airports"><option value="Frankfurt"><option value="Leipzig"><option value="Cologne"><option value="Munich"><option value="Liege"><option value="Brussels"><option value="Amsterdam"><option value="Paris"><option value="Luxembourg"><option value="Milan"><option value="Madrid"><option value="Vienna"><option value="Copenhagen"><option value="Warsaw"><option value="Budapest"><option value="London Heathrow"><option value="Zurich"><option value="Istanbul"><option value="New York JFK"><option value="Chicago"><option value="Los Angeles"><option value="Toronto"><option value="Mexico City"><option value="Sao Paulo"><option value="Shanghai"><option value="Hong Kong"><option value="Tokyo Narita"><option value="Seoul Incheon"><option value="Singapore"><option value="Delhi"><option value="Mumbai"><option value="Sydney"><option value="Dubai"></datalist>
+    </section>
+    <a class="jump noprint" id="jump" href="#result"><b id="jump-n">0</b> things to settle. View the list</a>
+  </div>
+
+  <div class="result" id="result" aria-labelledby="h-result">
+    <div class="noprint">
+      <h2 id="h-result">3 Before you order</h2>
+    </div>
+
+    <dl class="recap" id="recap"></dl>
+
+    <div class="top">
+      <div class="plate"><div class="plate-n" id="count">0</div><div class="plate-l">things to settle</div></div>
+      <div>
+        <p class="recap-line" id="line" aria-live="polite"></p>
+        <div class="chips" id="chips"></div>
+        <p class="progress noprint" id="progress"></p>
+      </div>
+    </div>
+
+    <p class="cover" id="cover" hidden></p>
+
+    <div class="first" id="first" hidden>
+      <h3>Settle these first</h3>
+      <div id="first-list"></div>
+    </div>
+
+    <div id="groups" style="display:grid;gap:26px"></div>
+
+    <details class="skipped" id="skipped">
+      <summary>Not needed for this order</summary>
+      <ul id="skipped-list"></ul>
+    </details>
+
+    <div class="est" id="est">
+      <div class="est-head"><h3>Costs and deadlines</h3><span class="tag">Estimates</span></div>
+      <dl id="est-list"></dl>
+    </div>
+
+    <div>
+      <h3>Message to the supplier</h3>
+      <div class="msg" id="msg"></div>
+    </div>
+
+    <div class="actions">
+      <button class="btn solid" type="button" id="btn-copy">Copy message</button>
+      <button class="btn" type="button" id="btn-print">Print or save as PDF</button>
+      <span class="status" id="status" aria-live="polite"></span>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>As of 21 November 2026. Orientation only, not legal advice. The list applies general rules to the values you enter. Local rules are built in for the EU, Norway, Iceland, Liechtenstein, the United Kingdom, Switzerland, Türkiye, the United States, Canada, Mexico, Brazil, China, Japan, South Korea, India and Australia. The EU rules are the most detailed; for the other countries the list covers the main duties. For every other destination it shows the general checks and what to confirm locally. It cannot see the restrictions of a specific carrier, ship, flight or port, and it does not check your product against the dangerous goods list. The shipper stays responsible for the classification. Label languages follow national rules, so confirm them for countries with more than one official language. The UK rules shown are those of Great Britain; Northern Ireland follows EU rules.</p>
+    <details class="noprint">
+      <summary>Sources</summary>
+      <ul>
+        <li><a href="https://www.imo.org/en/publications/pages/imdg%20code.aspx">IMO: IMDG Code</a>, <a href="https://www.iata.org/dangerousgoods">IATA: Dangerous Goods Regulations</a>, <a href="https://www.iata.org/en/iata-repository/pressroom/fact-sheets/fact-sheet-lithium-batteries">IATA: lithium batteries</a>, <a href="https://trans.info/en/adr-2027-changes-507286">ADR 2025 and 2027</a></li>
+        <li><a href="https://eua.one-line.com/dg-soc-application">ONE Europe: dangerous goods declaration closing</a>, <a href="https://www.hapag-lloyd.com/en/news-insights/news/2020/06/new-zealand---dangerous-goods-amendment---cancellation-fee.html">Hapag-Lloyd: dangerous goods papers before cut-off</a>, <a href="https://container-news.com/hapag-lloyd-updates-dangerous-goods-documentation-in-spain-and-portugal/">Container News: missed cut-off</a></li>
+        <li><a href="https://www.hapag-lloyd.com/content/dam/website/downloads/pdf/Dangerous-Good-Premium-charge-December-2025.pdf">Hapag-Lloyd: dangerous goods premium list</a>, <a href="https://www.hapag-lloyd.com/fr/services-information/news/2020/10/fee-for-dangerous-goods-misdeclaration.html">misdeclaration fee</a>, <a href="https://www.zim.com/customer-updates/cargo-misdeclaration-policy-update">ZIM: misdeclaration fees</a></li>
+        <li><a href="https://www.aclcargo.com/free-time-demurrage/">ACL: free time and demurrage, Hamburg</a>, <a href="https://www.hamburg-port-authority.de/fileadmin/user_upload/seh/GGBVOHH_2021.pdf">Hamburg Port Authority: dangerous goods regulation</a></li>
+        <li><a href="https://mydhl.express.dhl/lu/de/ship/surcharges.html">DHL Express: surcharges 2026 (Luxembourg list)</a>, <a href="https://www.dhl.com/content/dam/dhl/global/dhl-global-forwarding/documents/pdf/dhl-dgf-customer%20advisory-mandatory-battery-declaration-25September2026.pdf">DHL Global Forwarding: battery declaration</a></li>
+        <li><a href="https://www.ups.com/de/en/supplychain/resources/news-and-market-updates/import-control-system-2">UPS: EU entry declaration (ICS2)</a>, <a href="https://trade.ec.europa.eu/access-to-markets/en/content/help-my-trade-assistant-0">European Commission: Access2Markets</a>, <a href="https://taxation-customs.ec.europa.eu/customs/common-customs-tariff-cct/tariff-classification-goods/eu-customs-tariff-taric_en">TARIC</a></li>
+        <li><a href="https://europa.eu/youreurope/business/product-requirements/chemicals/registering-chemicals-reach/faq/index_en.htm">Your Europe: REACH registration</a>, <a href="https://hsa.ie/your_industry/chemicals/legislation_enforcement/classification-labelling-and-packaging-clp/roles-and-obligations/">HSA: importer duties under CLP</a>, <a href="https://eur-lex.europa.eu/eli/reg/2023/1542">EU Batteries Regulation</a>, <a href="https://eur-lex.europa.eu/EN/legal-content/summary/marketing-and-use-of-explosive-precursors-from-31-january-2021.html">EU explosives precursors rules</a></li>
+        <li>Any destination: <a href="https://www.macmap.org/query/customs-duties">ITC Market Access Map</a>, <a href="https://au.one-line.com/news/recapping-one-advanced-manifest-submissions-ams-regulations">ONE: advance manifest rules</a></li>
+        <li>United Kingdom: <a href="https://www.gov.uk/guidance/safety-and-security-declarations/what-safety-and-security-declarations-are-and-why-we-have-them">safety and security declarations</a>, <a href="https://www.hse.gov.uk/chemical-classification/what-to-do/import-chemicals.htm">HSE: importer duties under GB CLP</a>, <a href="https://www.hse.gov.uk/chemical-classification/legal/changes-gb-clp-regulation.htm">HSE: changes to GB CLP</a>, <a href="https://www.gov.uk/government/consultations/uk-reach-extending-dossier-submission-deadlines-for-transitional-registrations">UK REACH deadlines</a></li>
+        <li>Switzerland: <a href="https://www.anmeldestelle.admin.ch/en/labelling">labelling</a>, <a href="https://www.bag.admin.ch/en/the-ufi-code-rapid-aid-in-an-emergency">UFI and product register</a>. Türkiye: <a href="https://www.ricardo.com/en/news-and-insights/industry-insights/kkdik-enforcement-principles-finalised-key-deadlines-and-industry-guidance-released">KKDIK deadlines</a></li>
+        <li>United States: <a href="https://www.ghy.com/trade-talk/us-importer-security-filing-isf/">Importer Security Filing</a>, <a href="https://www.epa.gov/node/77255">EPA: importing chemicals under TSCA</a>, <a href="https://www.osha.gov/hazcom/rulemaking/extension">OSHA: hazard communication dates</a>, <a href="https://www.law.cornell.edu/cfr/text/49/171.22">49 CFR 171.22</a></li>
+        <li>Canada: <a href="https://www.canada.ca/en/border-services-agency/services/carm/schedule.html">CARM</a>, <a href="https://www.canada.ca/en/health-canada/services/environmental-workplace-health/occupational-health-safety/workplace-hazardous-materials-information-system/amendments-hazardous-products-regulations.html">Hazardous Products Regulations</a>, <a href="https://www.canada.ca/en/environment-climate-change/services/canadian-environmental-protection-act-registry/new-substances-notification-regulations-questions.html">new substances</a>. Mexico: <a href="https://trade.gov/knowledge-product/mexico-import-requirements-and-documentation">import requirements</a>, <a href="https://www.gob.mx/cms/uploads/attachment/file/680180/NOM-018-STPS-2015_09oct15.pdf">NOM-018-STPS-2015</a>. Brazil: <a href="https://insightplus.bakermckenzie.com/bm/environment-climate-change_1/brazil-law-establishes-the-national-inventory-of-chemical-substances">Law 15.022</a>, <a href="https://www.dhl.com/discover/en-br/logistics-advice/radar-siscomex-brazil">RADAR</a></li>
+        <li>China: <a href="https://www.cirs-group.com/en/chemicals/china-customs-announces-information-required-for-the-inspection-of-hazardous-chemicals-subject-to-import-and-export">customs inspection of hazardous chemicals</a>, <a href="https://www.ul.com/news/china-publishes-first-law-safety-hazardous-chemicals">Hazardous Chemicals Safety Law</a>, <a href="https://www.ul.com/news/china-revises-new-chemical-substance-registration-measures">new substance registration</a>, <a href="https://www.tuvsud.com/en/knowledge-hub/technical-updates/consumer-products-and-retail-essentials/china-announcement-of-compulsory-product-certification-management-for-lithium-ion-batteries">CCC for batteries</a></li>
+        <li>Japan: <a href="https://www.nite.go.jp/chem/kasinn/basic_information.html">NITE: new chemical substances</a>, <a href="https://www.customs.go.jp/english/summary/advance5/summary.pdf">advance filing rules</a>. South Korea: <a href="https://www.intertek.com/blog/2026/09-29-k-reach-2027-deadline/">K-REACH deadlines</a>, <a href="https://www.intertek.com/assuris/chemicals/regulatory/south-korea-osha/">safety data sheet submission</a></li>
+        <li>India: <a href="https://dgft.gov.in/CP/iec-profile-management">Importer Exporter Code</a>, <a href="https://intertek.com/blog/2024/10-09-indias-hazardous-chemicals-rules-1989">hazardous chemicals rules</a>. Australia: <a href="https://www.industrialchemicals.gov.au/node/213">AICIS registration</a>, <a href="https://www.safeworkaustralia.gov.au/safety-topic/hazards/chemicals/safety-data-sheets/preparing-safety-data-sheets">Safe Work Australia: safety data sheets</a></li>
+      </ul>
+    </details>
+  </div>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+  function $(s, r) { return (r || document).querySelector(s); }
+  function $$(s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); }
+  function mk(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+
+  /* ---------- Reference data ---------- */
+  var EU = {
+    AT: ['Austria', 'German'], BE: ['Belgium', 'Dutch, French or German, depending on the region'], BG: ['Bulgaria', 'Bulgarian'],
+    HR: ['Croatia', 'Croatian'], CY: ['Cyprus', 'Greek'], CZ: ['Czechia', 'Czech'], DK: ['Denmark', 'Danish'], EE: ['Estonia', 'Estonian'],
+    FI: ['Finland', 'Finnish and Swedish'], FR: ['France', 'French'], DE: ['Germany', 'German'], GR: ['Greece', 'Greek'], HU: ['Hungary', 'Hungarian'],
+    IE: ['Ireland', 'English'], IT: ['Italy', 'Italian'], LV: ['Latvia', 'Latvian'], LT: ['Lithuania', 'Lithuanian'], LU: ['Luxembourg', 'French or German'],
+    MT: ['Malta', 'Maltese or English'], NL: ['Netherlands', 'Dutch'], PL: ['Poland', 'Polish'], PT: ['Portugal', 'Portuguese'], RO: ['Romania', 'Romanian'],
+    SK: ['Slovakia', 'Slovak'], SI: ['Slovenia', 'Slovenian'], ES: ['Spain', 'Spanish'], SE: ['Sweden', 'Swedish']
+  };
+  var COUNTRIES = 'AF:Afghanistan|AL:Albania|DZ:Algeria|AO:Angola|AG:Antigua and Barbuda|AR:Argentina|AM:Armenia|AU:Australia|AT:Austria|AZ:Azerbaijan|BS:Bahamas|BH:Bahrain|BD:Bangladesh|BB:Barbados|BY:Belarus|BE:Belgium|BZ:Belize|BJ:Benin|BT:Bhutan|BO:Bolivia|BA:Bosnia and Herzegovina|BW:Botswana|BR:Brazil|BN:Brunei|BG:Bulgaria|BF:Burkina Faso|BI:Burundi|KH:Cambodia|CM:Cameroon|CA:Canada|CV:Cape Verde|CF:Central African Republic|TD:Chad|CL:Chile|CN:China|CO:Colombia|KM:Comoros|CG:Congo|CD:DR Congo|CR:Costa Rica|CI:Côte d\'Ivoire|HR:Croatia|CU:Cuba|CY:Cyprus|CZ:Czechia|DK:Denmark|DJ:Djibouti|DM:Dominica|DO:Dominican Republic|EC:Ecuador|EG:Egypt|SV:El Salvador|GQ:Equatorial Guinea|ER:Eritrea|EE:Estonia|SZ:Eswatini|ET:Ethiopia|FJ:Fiji|FI:Finland|FR:France|GA:Gabon|GM:Gambia|GE:Georgia|DE:Germany|GH:Ghana|GR:Greece|GD:Grenada|GT:Guatemala|GN:Guinea|GW:Guinea-Bissau|GY:Guyana|HT:Haiti|HN:Honduras|HK:Hong Kong|HU:Hungary|IS:Iceland|IN:India|ID:Indonesia|IR:Iran|IQ:Iraq|IE:Ireland|IL:Israel|IT:Italy|JM:Jamaica|JP:Japan|JO:Jordan|KZ:Kazakhstan|KE:Kenya|KI:Kiribati|XK:Kosovo|KW:Kuwait|KG:Kyrgyzstan|LA:Laos|LV:Latvia|LB:Lebanon|LS:Lesotho|LR:Liberia|LY:Libya|LI:Liechtenstein|LT:Lithuania|LU:Luxembourg|MO:Macao|MG:Madagascar|MW:Malawi|MY:Malaysia|MV:Maldives|ML:Mali|MT:Malta|MH:Marshall Islands|MR:Mauritania|MU:Mauritius|MX:Mexico|FM:Micronesia|MD:Moldova|MN:Mongolia|ME:Montenegro|MA:Morocco|MZ:Mozambique|MM:Myanmar|NA:Namibia|NR:Nauru|NP:Nepal|NL:Netherlands|NZ:New Zealand|NI:Nicaragua|NE:Niger|NG:Nigeria|KP:North Korea|MK:North Macedonia|NO:Norway|OM:Oman|PK:Pakistan|PW:Palau|PS:Palestine|PA:Panama|PG:Papua New Guinea|PY:Paraguay|PE:Peru|PH:Philippines|PL:Poland|PT:Portugal|QA:Qatar|RO:Romania|RU:Russia|RW:Rwanda|KN:Saint Kitts and Nevis|LC:Saint Lucia|VC:Saint Vincent and the Grenadines|WS:Samoa|ST:São Tomé and Príncipe|SA:Saudi Arabia|SN:Senegal|RS:Serbia|SC:Seychelles|SL:Sierra Leone|SG:Singapore|SK:Slovakia|SI:Slovenia|SB:Solomon Islands|SO:Somalia|ZA:South Africa|KR:South Korea|SS:South Sudan|ES:Spain|LK:Sri Lanka|SD:Sudan|SR:Suriname|SE:Sweden|CH:Switzerland|SY:Syria|TW:Taiwan|TJ:Tajikistan|TZ:Tanzania|TH:Thailand|TL:Timor-Leste|TG:Togo|TO:Tonga|TT:Trinidad and Tobago|TN:Tunisia|TR:Türkiye|TM:Turkmenistan|TV:Tuvalu|UG:Uganda|UA:Ukraine|AE:United Arab Emirates|GB:United Kingdom|US:United States|UY:Uruguay|UZ:Uzbekistan|VU:Vanuatu|VE:Venezuela|VN:Vietnam|YE:Yemen|ZM:Zambia|ZW:Zimbabwe';
+  var NAME = {};
+  COUNTRIES.split('|').forEach(function (p) { var i = p.indexOf(':'); NAME[p.slice(0, i)] = p.slice(i + 1); });
+  var EEA = { NO: ['Norway', 'Norwegian'], IS: ['Iceland', 'Icelandic'], LI: ['Liechtenstein', 'German'] };
+  /* Countries that apply the road agreement ADR */
+  var ADR = {};
+  'AL AD AM AT AZ BY BE BA BG HR CY CZ DK EE FI FR GE DE GR HU IS IE IT KZ LV LI LT LU MT MD ME MA NL NG MK NO PL PT RO RU SM RS SK SI ES SE CH TJ TN TR UG UA GB UZ'.split(' ').forEach(function (k) { ADR[k] = 1; });
+  /* Markets outside the EU and EEA with local rules built in: label language and importer ID */
+  var MARKET = {
+    GB: { lang: 'English', idT: 'Get a GB EORI number', idD: 'You need this customs ID to import into Great Britain. An EORI number from an EU country is not valid there.', hint: 'A GB EORI number, the customs ID for importers.' },
+    CH: { lang: 'an official language of the place where it is sold (German, French or Italian)' },
+    TR: { lang: 'Turkish' },
+    US: { lang: 'English', idT: 'Get an importer number and a customs bond', idD: 'US customs identifies you by an importer of record number, usually your tax ID. Commercial shipments also need a customs bond. A broker can set up both.', hint: 'An importer number with US customs and a customs bond.' },
+    CA: { lang: 'English and French', idT: 'Register in the CARM portal and post security', idD: 'Importers need a Business Number with an import account and a registration in the CARM portal of the border agency. To have goods released before duty is paid, you must post your own bond or deposit.', hint: 'A Business Number with an import account, registered in the CARM portal.' },
+    MX: { lang: 'Spanish', idT: 'Get onto the importers\' register', idD: 'Importers need a Mexican tax ID (RFC) and an entry in the importers\' register (Padrón de Importadores). Chemicals also need the register for specific sectors.', hint: 'A tax ID (RFC) and an entry in the importers\' register.' },
+    BR: { lang: 'Portuguese', idT: 'Get the Siscomex licence (RADAR)', idD: 'Without this registration with the Brazilian tax authority, a company cannot file an import declaration in its own name.', hint: 'The Siscomex licence, known as RADAR.' },
+    CN: { lang: 'Chinese', idT: 'Check the importer is registered with China Customs', idD: 'As a rule the consignee must be a company in China that is registered with customs. Without one you need a Chinese importer or trading agent.', hint: 'A company in China that is registered with customs.' },
+    JP: { lang: 'Japanese' },
+    KR: { lang: 'Korean' },
+    IN: { lang: '', idT: 'Get an Importer Exporter Code (IEC)', idD: 'No import into India is allowed without this code from the foreign trade authority DGFT.', hint: 'An Importer Exporter Code (IEC).' },
+    AU: { lang: 'English' }
+  };
+  /* The EU, Norway, Switzerland and Liechtenstein form one customs security area */
+  function SEC(c) { return !!EU[c] || c === 'NO' || c === 'CH' || c === 'LI'; }
+  var THE = { US: 1, GB: 1, NL: 1, PH: 1, AE: 1, DO: 1, CF: 1, BS: 1, MV: 1, SC: 1, KM: 1, MH: 1, SB: 1, GM: 1 };
+  var SANCTION = { RU: 1, BY: 1, IR: 1, KP: 1 };
+  /* Incoterms 2020: who arranges the main carriage, who clears import */
+  var TERMS = {
+    EXW: { carriage: 'you', imp: 'you' }, FCA: { carriage: 'you', imp: 'you' },
+    FAS: { carriage: 'you', imp: 'you', sea: 1 }, FOB: { carriage: 'you', imp: 'you', sea: 1 },
+    CFR: { carriage: 'supplier', imp: 'you', sea: 1 }, CIF: { carriage: 'supplier', imp: 'you', sea: 1 },
+    CPT: { carriage: 'supplier', imp: 'you' }, CIP: { carriage: 'supplier', imp: 'you' },
+    DAP: { carriage: 'supplier', imp: 'you' }, DPU: { carriage: 'supplier', imp: 'you' },
+    DDP: { carriage: 'supplier', imp: 'supplier' }
+  };
+  var PRESET = {
+    spray:    { name: 'Spray can', sds: 'yes', dg: 'yes', un: '1950', cls: '2.1', pg: '', lq: '1', inner: '0.4', unit: 'L', haz: 'yes' },
+    paint:    { name: 'Paint', sds: 'yes', dg: 'yes', un: '1263', cls: '3', pg: 'II', lq: '5', inner: '5', unit: 'L', haz: 'yes' },
+    adhesive: { name: 'Adhesive', sds: 'yes', dg: 'yes', un: '1133', cls: '3', pg: 'II', lq: '5', inner: '1', unit: 'L', haz: 'yes' },
+    solvent:  { name: 'Solvent', sds: 'yes', dg: 'yes', un: '1993', cls: '3', pg: 'II', lq: '1', inner: '1', unit: 'L', haz: 'yes' },
+    cleaner:  { name: 'Cleaner', sds: 'yes', dg: 'no', un: '', cls: '', pg: '', lq: '', inner: '', unit: 'L', haz: 'yes' }
+  };
+  var EXAMPLE = { name: 'Solvent-based paint', kind: 'chem', sds: 'yes', dg: 'yes', un: '1263', cls: '3', pg: 'II', lq: '5', inner: '5', unit: 'L',
+    chem: 'ion', fit: 'with', wh: '', haz: 'yes', annual: 'lt', hs: '320810', marine: false, biocide: false, precursor: false,
+    origin: 'CN', dest: 'DE', mode: 'sea', service: 'freight', pol: 'Shanghai', poe: 'Hamburg', tranship: 'unknown', aol: '', aoe: '', term: 'FOB', eori: 'yes' };
+  var BLANK = { name: '', kind: 'chem', sds: 'no', dg: 'unknown', un: '', cls: '', pg: '', lq: '', inner: '', unit: 'L',
+    chem: 'ion', fit: 'with', wh: '', haz: 'unknown', annual: 'unknown', hs: '', marine: false, biocide: false, precursor: false,
+    origin: 'CN', dest: 'DE', mode: 'sea', service: 'freight', pol: '', poe: '', tranship: 'unknown', aol: '', aoe: '', term: '', eori: 'unknown' };
+
+  /* Example carrier list price for sea freight, USD per container (one carrier, December 2025) */
+  function seaPremium(cls, unStr) {
+    var u = parseInt(unStr, 10) || 0;
+    function among(a) { return a.indexOf(u) >= 0; }
+    if (cls === '2.1') return u === 1057 ? 800 : 200;
+    if (cls === '2.2' || cls === '2.3' || cls === '3' || cls === '6.1' || cls === '8') return 200;
+    if (cls === '9') return u === 2071 ? 750 : (among([3480, 3481, 3090, 3091, 3171, 3536, 3556, 3557]) ? 300 : 200);
+    if (cls === '4.1') return ((u >= 3231 && u <= 3240) || u === 3533 || u === 3534) ? 12500 : 300;
+    if (cls === '4.2') return u === 1361 ? 250 : (among([1381, 3342]) ? 800 : (u === 3341 ? 1200 : 300));
+    if (cls === '4.3') return 300;
+    if (cls === '5.1') return among([1942, 2067, 2426, 3375, 1748, 2208, 2880, 3485, 3486, 3487]) ? 750 : 325;
+    if (cls === '5.2') return (u >= 3111 && u <= 3120) ? 12500 : 500;
+    return null;
+  }
+
+  /* ---------- Form state ---------- */
+  var RADIOS = ['kind', 'sds', 'dg', 'chem', 'fit', 'haz', 'annual', 'mode', 'service', 'tranship', 'eori'];
+  var FIELDS = ['name', 'un', 'cls', 'pg', 'lq', 'inner', 'unit', 'wh', 'hs', 'origin', 'dest', 'pol', 'poe', 'aol', 'aoe', 'term'];
+  var FLAGS = ['marine', 'biocide', 'precursor'];
+  function read() {
+    var s = {};
+    RADIOS.forEach(function (n) { var e = $('input[name="' + n + '"]:checked'); s[n] = e ? e.value : ''; });
+    FIELDS.forEach(function (n) { s[n] = String($('[name="' + n + '"]').value || '').trim(); });
+    FLAGS.forEach(function (n) { s[n] = $('[name="' + n + '"]').checked; });
+    return s;
+  }
+  function write(s) {
+    RADIOS.forEach(function (n) { $$('input[name="' + n + '"]').forEach(function (e) { e.checked = e.value === s[n]; }); });
+    FIELDS.forEach(function (n) { $('[name="' + n + '"]').value = s[n] == null ? '' : s[n]; });
+    FLAGS.forEach(function (n) { $('[name="' + n + '"]').checked = !!s[n]; });
+  }
+
+  /* ---------- The rule set ---------- */
+  function build(s) {
+    var items = [], skipped = [], asks = [], est = [];
+    var lith = s.kind !== 'chem', ion = s.chem !== 'metal';
+    var unOk = /^\d{4}$/.test(s.un);
+    var un = lith ? (s.kind === 'batt' ? (ion ? '3480' : '3090') : (ion ? '3481' : '3091')) : (unOk ? s.un : '');
+    var cls = lith ? '9' : s.cls;
+    var dg = lith ? 'yes' : s.dg;
+    var haz = lith ? 'no' : s.haz;
+    var P = s.name || 'the product';
+    var UNs = un ? 'UN ' + un : 'the UN number';
+    var both = un && cls ? 'UN ' + un + ', class ' + cls : (un ? 'UN ' + un : (cls ? 'class ' + cls : 'the dangerous goods'));
+    var originN = NAME[s.origin] || 'the origin country', destN = NAME[s.dest] || 'the destination country';
+    var origin = (THE[s.origin] ? 'the ' : '') + originN, dest = (THE[s.dest] ? 'the ' : '') + destN;
+    var euO = !!EU[s.origin], euD = !!EU[s.dest], areaO = euO || !!EEA[s.origin], areaD = euD || !!EEA[s.dest];
+    var mkt = euD ? 'EU' : (EEA[s.dest] ? 'EEA' : (MARKET[s.dest] ? s.dest : ''));
+    var M = MARKET[s.dest] || {};
+    var lang = euD ? EU[s.dest][1] : (EEA[s.dest] ? EEA[s.dest][1] : (M.lang || 'the local language'));
+    var same = s.origin === s.dest;
+    var cu = (s.origin === 'CH' && s.dest === 'LI') || (s.origin === 'LI' && s.dest === 'CH');
+    var border = !same && !(euO && euD) && !cu;
+    var importer = !same && !(areaO && areaD && (!lith || (euO && euD)));
+    var adrRoute = !!(ADR[s.origin] && ADR[s.dest]);
+    var secZone = SEC(s.origin) && SEC(s.dest);
+    var route = same ? 'within ' + dest : originN + ' to ' + dest;
+    var T = TERMS[s.term] || null;
+    var carr = T ? (T.carriage === 'you' ? 'You' : 'Supplier') : 'You or supplier';
+    var imp = T ? (T.imp === 'you' ? 'You' : 'Supplier') : 'You';
+    var mode = s.mode, express = (mode === 'road' || mode === 'air') && s.service === 'express';
+    var by = { road: 'by road', rail: 'by rail', sea: 'by sea', air: 'by air' }[mode];
+    var special = dg === 'yes' && (cls === '1' || cls === '6.2' || cls === '7');
+    var lq = s.lq === '' ? NaN : parseFloat(s.lq), inner = parseFloat(s.inner);
+    var lqs = lith || dg !== 'yes' ? 'na' : (isNaN(lq) ? 'open' : (lq === 0 ? 'no' : (isNaN(inner) || inner <= 0 ? 'open' : (inner <= lq ? 'yes' : 'no'))));
+    var wh = parseFloat(s.wh), whKnown = lith && !isNaN(wh) && wh > 0;
+    var small = whKnown ? (ion ? wh <= 100 : wh <= 2) : null;
+    var size = ion ? wh + ' Wh' : wh + ' g of lithium';
+    var declared = dg === 'yes' && !(lith && small === true && mode !== 'air');
+    var hs = s.hs.replace(/\D/g, '');
+    var pol = s.pol || 'the loading port', poe = s.poe || 'the arrival port';
+
+    function add(g, who, t, d, o) {
+      var it = { g: g, who: who, t: t, d: d, id: g + '|' + t };
+      if (o && o.first) it.first = true;
+      if (o && o.link) it.link = o.link;
+      if (o && o.ask) asks.push(o.ask);
+      items.push(it);
+    }
+
+    /* Group 0: product and transport rules */
+    if (!lith && s.sds !== 'yes') {
+      add(0, 'Supplier', 'Get the safety data sheet', 'Section 14 holds the transport classification. Without it, the rest of this list is a guess.', { first: true, ask: 'The current safety data sheet.' });
+    }
+    if (dg === 'unknown') {
+      add(0, 'Supplier', 'Find out whether it counts as dangerous goods in transport', 'Section 14 of the safety data sheet either says not regulated or gives a UN number and a class.', { first: true, ask: 'Whether the product is classified as dangerous goods for transport (section 14 of the safety data sheet).' });
+    }
+    if (dg === 'yes' && !lith && (!un || !cls)) {
+      add(0, 'Supplier', 'Get the UN number, class and packing group', 'They are in section 14 of the safety data sheet and decide packaging, labels and papers.', { ask: 'The UN number, class and packing group.' });
+    }
+    if (special) {
+      add(0, 'You', 'Bring in a dangerous goods forwarder first', 'Class ' + cls + ' is refused by many carriers and ports and often needs permits. Do not order before a specialist has confirmed the route.', { first: true });
+    }
+    if (dg === 'no') {
+      add(0, 'You', 'Keep proof that it is not dangerous goods', 'Carriers often query chemicals. The safety data sheet with "not regulated" in section 14 settles it.');
+      skipped.push('Dangerous goods packaging and papers: the product is not dangerous goods in transport.');
+      skipped.push('Carrier approval: a normal booking is enough.');
+    }
+
+    if (dg === 'yes' && !lith) {
+      var packs = 'Inner packs of ' + inner + ' ' + s.unit + ' are within the ' + lq + ' ' + s.unit + ' limit';
+      if (lqs === 'open' && mode !== 'air' && !special) {
+        add(0, 'Supplier', 'Ask for the limited-quantity limit and the pack size', 'If each inner pack is at or under the limit for ' + UNs + ', the shipment travels with far fewer formalities. Enter both values to see which case applies.', { ask: 'The limited-quantity limit for ' + UNs + ' and the size of the inner packs.' });
+      }
+      if (mode === 'road' || mode === 'rail') {
+        if (lqs === 'yes') {
+          add(0, 'Supplier', 'Confirm it ships as limited quantities', packs + (adrRoute ? '. Each box may weigh up to 30 kg and must show the limited-quantity mark. No dangerous goods transport document is needed ' + by + '.' : '. Under the UN model rules each box may weigh up to 30 kg and shows the limited-quantity mark. Whether a transport document is still needed depends on ' + (same ? 'the national rules.' : 'the rules of each country on the route.')), { ask: 'Confirmation that you will ship as limited quantities: inner packs of ' + inner + ' ' + s.unit + ', boxes up to 30 kg, limited-quantity mark.' });
+          if (adrRoute) skipped.push('Dangerous goods transport document: not needed ' + by + ' for limited quantities.');
+        } else if (lqs === 'no') {
+          add(0, 'Supplier', 'Plan for a fully regulated shipment', (lq === 0 ? 'Limited quantities are not allowed for this entry' : 'The pack size is above the limited-quantity limit') + '. The supplier needs UN-approved packaging, hazard labels and a transport document that states ' + both + (s.pg ? ', packing group ' + s.pg : '') + '.', { ask: 'Confirmation of UN-approved packaging, hazard labels and a transport document for ' + both + '.' });
+          add(0, carr, 'Check the carrier is set up for class ' + (cls || 'of the goods'), !adrRoute
+            ? 'The carrier must be authorised and equipped for dangerous goods' + (same ? '' : ' in every country on the route') + '. Give it the class and quantity when you ask for the quote.'
+            : mode === 'road'
+            ? 'Above small-load thresholds the driver needs dangerous goods training and the vehicle orange plates. Give the carrier the class and quantity when you ask for the quote.'
+            : 'The rail operator applies the same rules as road transport. Give it the class and quantity when you ask for the quote.');
+        }
+        if (!adrRoute && same) add(0, carr, 'Ask the carrier which national rules apply', 'Inside ' + dest + ', dangerous goods on road and rail follow national rules' + (s.dest === 'US' ? ', in the US 49 CFR' : (s.dest === 'CA' ? ', in Canada the TDG Regulations' : '')) + '. The carrier must confirm papers, marks and vehicle rules.');
+        else if (!adrRoute) add(0, carr, 'Ask which ' + mode + ' rules apply on each leg', 'Dangerous goods rules for road and rail are regional: ADR and RID in Europe and nearby countries, 49 CFR in the US, TDG in Canada, national rules elsewhere. The forwarder must confirm papers, marks and vehicle rules for every country on the route.');
+      } else if (mode === 'sea') {
+        add(0, 'Supplier', 'Get a dangerous goods declaration from the shipper', 'Required at sea for ' + UNs + ', even for small packs. Whoever loads the container also signs a container packing certificate.', { ask: 'A draft dangerous goods declaration (IMDG) and, if you load the container, the container packing certificate.' });
+        if (lqs === 'yes') add(0, 'Supplier', 'Have "limited quantity" stated on the declaration', packs + ', so the packaging rules are lighter. The papers stay mandatory at sea.', { ask: 'Confirmation that you will ship as limited quantities: inner packs of ' + inner + ' ' + s.unit + ', boxes up to 30 kg.' });
+        if (lqs === 'no') add(0, 'Supplier', 'Confirm UN-approved packaging', (lq === 0 ? 'Limited quantities are not allowed for this entry' : 'The pack size is above the limited-quantity limit') + '. The goods need tested packaging with a UN mark and hazard labels on every package.', { ask: 'Confirmation of UN-approved packaging and hazard labels.' });
+        if (s.marine) add(0, 'Supplier', 'Have it declared as a marine pollutant', 'Section 14 marks it as environmentally hazardous. The declaration and the packages must show this.');
+      } else if (mode === 'air') {
+        add(0, 'Supplier', 'Get a shipper\'s declaration, signed by trained staff', 'Air freight needs a Shipper\'s Declaration for Dangerous Goods for ' + UNs + '. The supplier\'s staff must hold valid dangerous goods training.', { ask: 'A draft Shipper\'s Declaration for Dangerous Goods and confirmation that your team\'s dangerous goods training is current.' });
+        add(0, carr, 'Check the quantity per package against the airline limits', 'For every UN number the air rules set a maximum per package, separately for passenger and cargo aircraft. Some goods may not fly at all. Have the forwarder confirm it for your pack size.');
+      }
+    }
+
+    if (lith) {
+      add(0, 'Supplier', 'Get the UN 38.3 test summary', 'Every lithium battery type must have passed these tests. Carriers ask for the summary.', { ask: 'The UN 38.3 test summary for the battery.' });
+      if (!whKnown) {
+        add(0, 'Supplier', ion ? 'Get the watt-hour rating per battery' : 'Get the lithium content per battery', (ion ? '100 Wh' : '2 g of lithium') + ' is the line between the simplified and the fully regulated rule.', { ask: ion ? 'The watt-hour rating per battery.' : 'The lithium content per battery in grams.' });
+      }
+      if (mode !== 'air') {
+        if (small === true) {
+          add(0, 'Supplier', 'Confirm the simplified battery rule is used', 'At ' + size + ' the battery falls under the small-battery rule (special provision 188): tested type, strong outer box, lithium battery mark' + (s.kind === 'device' && s.fit === 'in' ? ', device protected against switching on.' : ', boxes of 30 kg or less.'), { ask: 'Confirmation that you ship under special provision 188 with the lithium battery mark.' });
+          skipped.push('Dangerous goods transport document: not needed ' + by + ' under the small-battery rule.');
+        } else if (small === false) {
+          add(0, 'Supplier', 'Plan for a fully regulated class 9 shipment', 'At ' + size + ' the battery is above the small-battery line. It needs UN-approved packaging, the class 9 battery label and a transport document.', { ask: 'Confirmation of UN-approved packaging and the class 9 battery label.' });
+        }
+        if (mode === 'sea') add(0, carr, 'Expect a battery declaration at booking', 'Ocean carriers and forwarders ask for battery details, the data sheet and the test summary, even under the simplified rule.');
+      } else {
+        if (s.kind === 'batt') {
+          add(0, carr, 'Book cargo aircraft only', 'Batteries shipped on their own may not travel on passenger aircraft. They need a shipper\'s declaration.', { ask: 'A draft Shipper\'s Declaration for Dangerous Goods.' });
+          if (ion) add(0, 'Supplier', 'Have the batteries shipped at 30% charge or less', 'Mandatory by air for lithium-ion batteries shipped on their own.', { ask: 'Confirmation that the batteries ship at 30% charge or less.' });
+        } else {
+          if (ion && s.fit === 'with') add(0, 'Supplier', 'Have the batteries shipped at 30% charge or less', 'Mandatory by air since January 2026 for lithium-ion batteries over 2.7 Wh packed with equipment.', { ask: 'Confirmation that the batteries ship at 30% charge or less.' });
+          if (small === true) add(0, 'Supplier', s.fit === 'in' ? 'Confirm the device is protected against switching on' : 'Confirm the small-battery section is used', 'At ' + size + ' per battery no shipper\'s declaration is needed by air. The box carries the lithium battery mark where required.');
+          if (small === false) add(0, 'Supplier', 'Plan for a fully regulated class 9 shipment', 'At ' + size + ' the battery is above the small-battery line. It needs a shipper\'s declaration, the class 9 battery label and tested packaging.', { ask: 'A draft Shipper\'s Declaration for Dangerous Goods.' });
+        }
+      }
+    }
+
+    if (mkt === 'US' && border && s.origin !== 'CA' && dg === 'yes' && declared) add(0, imp, 'Send the shipper the US transport requirements in writing', 'Whoever imports dangerous goods into the US must give the foreign shipper and the forwarder at the port of entry written information on the US hazardous materials rules that apply.' + (lqs === 'yes' ? '' : ' The shipping papers also need an emergency phone number that is answered at any time while the goods are on the move.'));
+
+    /* Group 1: carrier and ports */
+    if (!T) {
+      add(1, 'You and supplier', 'Agree the delivery term', 'The Incoterm decides who books the transport, who pays the dangerous goods surcharges and who clears customs.', { first: true });
+    } else {
+      if (s.term === 'EXW' && dg === 'yes') add(1, 'You', 'Avoid EXW for dangerous goods', 'EXW leaves loading and export clearance to you. Under FCA the supplier loads and clears export.');
+      if (T.sea && mode !== 'sea') add(1, 'You', 'Pick a term that fits the transport', s.term + ' is written for sea freight. For road, rail and air use FCA, CPT, CIP, DAP or DDP.');
+    }
+    if (dg === 'yes') {
+      if (carr === 'You') add(1, 'You', 'Get the carrier\'s acceptance in writing before you order', 'You book the transport under ' + s.term + '. Send the carrier or forwarder the safety data sheet and ask for acceptance of ' + both + '.');
+      else if (carr === 'Supplier') add(1, 'Supplier', 'Ask the supplier to confirm carrier acceptance', 'The supplier books the transport under ' + s.term + '. Ask for written confirmation that the carrier has accepted ' + both + '.', { ask: 'Written confirmation that your carrier has accepted ' + both + '.' });
+      else add(1, 'You or supplier', 'Get carrier acceptance before the order is firm', 'Whoever books the transport needs the carrier\'s written acceptance of ' + both + '.');
+
+      if (mode === 'sea') {
+        if (declared) add(1, carr, 'Ask for the dangerous goods cut-off', 'The final declaration is due earlier than the normal cut-off, often 2 to 3 working days before the ship. Late papers move the container to the next sailing.');
+        if (s.tranship !== 'direct') add(1, carr, 'Ask for the full routing', 'Each port where the container changes ship has its own dangerous goods restrictions. The carrier must confirm acceptance for every one.');
+        add(1, 'Supplier', 'Ask which export approvals ' + pol + ' needs', 'Many ports want their own dangerous goods permit or inspection before loading. Ask how long it takes.', { ask: 'Which export approvals ' + pol + ' needs for dangerous goods and how long they take.' });
+        add(1, imp, 'Plan the pick-up at ' + poe, !declared ? 'Line up customs clearance and the truck before the ship arrives. Ask the carrier whether the port treats the container as hazardous cargo.' : 'Hazardous containers get fewer free days and higher daily rates than normal cargo. Line up customs clearance and the truck before the ship arrives.' + (/hamburg/i.test(s.poe) ? ' Hamburg wants dangerous goods reported at least 24 hours before arrival; explosives and infectious substances may not wait in the port.' : (euD ? ' EU ports want dangerous goods reported before the ship arrives, as a rule 24 hours ahead.' : ' Ports want dangerous goods reported before the ship arrives. The carrier does this from your papers.')));
+      }
+      if (mode === 'air') {
+        add(1, carr, 'Ask which airline flies it and where it stops', 'Airlines and countries add their own dangerous goods restrictions on top of the international rules. The forwarder must check them for the whole route' + (s.aol || s.aoe ? ', ' + (s.aol || 'departure') + ' to ' + (s.aoe || 'arrival') + '.' : '.'));
+        add(1, 'Supplier', 'Expect a strict check at hand-over', 'The airline checks every package and paper and refuses the shipment on a single error.');
+      }
+      if (express) add(1, carr === 'You' ? 'You' : 'Supplier', 'Check there is a dangerous goods account with the service', 'Parcel and express services take dangerous goods only from approved shippers under contract, and not every class.', carr === 'You' ? null : { ask: 'Confirmation that you hold a dangerous goods account with the parcel or express service.' });
+    }
+
+    /* Group 2: customs */
+    var lookup = !euD ? { href: 'https://www.macmap.org/query/customs-duties', text: 'ITC Market Access Map' }
+      : (hs.length >= 6
+        ? { href: 'https://trade.ec.europa.eu/access-to-markets/en/results?product=' + hs + '&origin=' + s.origin + '&destination=' + s.dest, text: 'Look up ' + hs + ' in Access2Markets' }
+        : { href: 'https://trade.ec.europa.eu/access-to-markets/en/my-trade-assistant', text: 'Access2Markets' });
+    if (border) {
+      var sanc = SANCTION[s.origin] || SANCTION[s.dest];
+      if (sanc && euD) add(2, 'You', 'Check EU sanctions first', 'EU restrictive measures apply to trade with ' + origin + '. Many imports are banned.', { first: true, link: { href: 'https://www.sanctionsmap.eu/', text: 'EU Sanctions Map' } });
+      else if (sanc) add(2, 'You', 'Check sanctions first', 'Trade with ' + (SANCTION[s.dest] ? dest : origin) + ' is restricted by sanctions of the UN, the EU, the US, the UK and others. Many goods are banned. Check which rules bind you and your bank before anything else.', euO ? { first: true, link: { href: 'https://www.sanctionsmap.eu/', text: 'EU Sanctions Map' } } : { first: true });
+
+      var taxNote = euD ? 'Import VAT is charged at the rate of ' + dest + '.'
+        : (mkt === 'US' ? 'The US has no import VAT, but customs fees apply. Extra US duties by country of origin change often, so check again close to the order date.'
+          : 'Import taxes such as VAT or GST follow the rules of ' + dest + '.');
+      if (hs.length >= 6) add(2, 'You', 'Look up code ' + hs + ' for duty and restrictions', 'Check duty, anti-dumping duty and import licences for goods from ' + origin + '. ' + taxNote, { link: lookup });
+      else add(2, 'Supplier', 'Get the customs tariff code and the country of origin', 'Ask the supplier for the code, at least 6 digits, and where the goods were made. Both drive duty and import restrictions.', { link: lookup, ask: 'The customs tariff code (at least 6 digits) and the country of origin.' });
+
+      if (imp === 'You') {
+        if (s.eori !== 'yes') {
+          if (euD) add(2, 'You', 'Get an EORI number', 'You need this customs ID as importer. Without it the carrier cannot file the entry declaration and the goods will not clear.', { first: s.eori === 'no' });
+          else add(2, 'You', M.idT || 'Get registered as an importer in ' + dest, M.idD || 'Most countries want a customs or tax ID before a company can import. Your broker knows which one applies in ' + dest + ' and how long it takes.', { first: s.eori === 'no' });
+        }
+        add(2, 'You', 'Appoint a customs broker before the goods ship', 'The broker files the import declaration in ' + dest + ' and needs the invoice, packing list, tariff code and safety data sheet.');
+      } else {
+        add(2, 'Supplier', 'Ask who the importer of record is', euD
+          ? 'Under DDP the supplier clears customs and pays duty. A supplier outside the EU needs an EU importer or representative for this. Get the name in writing.'
+          : 'Under DDP the supplier clears customs and pays duty. A supplier without a company in ' + dest + ' needs a local importer of record or representative for this. Get the name in writing.',
+          { ask: euD ? 'The name of your EU importer of record under DDP.' : 'The name of your importer of record in ' + dest + ' under DDP.' });
+      }
+
+      if (secZone) skipped.push('Entry declaration for security: not needed between the EU, Norway, Switzerland and Liechtenstein.');
+      else if (euD) add(2, 'Supplier', 'Give the carrier an exact goods description', 'The carrier files an entry declaration before the goods reach the EU. It needs the 6-digit tariff code, the importer\'s EORI and a precise description. Vague terms such as "chemicals" are rejected.' + (mode === 'sea' ? ' For deep-sea containers this happens 24 hours before loading; short sea routes have later deadlines.' : ''));
+      else add(2, 'Supplier', 'Give the carrier an exact goods description', (mkt ? 'The carrier sends cargo data to customs in ' + dest + ' before the goods arrive' + (mkt === 'GB' ? ', in Great Britain also for goods from the EU' : '') + '.' : 'In most countries the carrier sends cargo data to customs before the goods arrive.') + ' It needs the tariff code, the importer\'s details and a precise description. Vague terms such as "chemicals" are rejected.' + (mode === 'sea' ? ' For sea freight to most large markets this happens about 24 hours before loading.' : ''));
+      if (mkt === 'US' && mode === 'sea') add(2, imp, 'File the Importer Security Filing on time', 'For sea freight to the US, the importer or its broker must send customs the Importer Security Filing (10+2) at least 24 hours before the container is loaded on the ship. A late, missing or wrong filing costs 5,000 USD.');
+
+      if (!sanc) {
+        var atr = (s.origin === 'TR' && euD) || (euO && s.dest === 'TR');
+        var oAg = euO ? 'the EU' : origin;
+        add(2, 'Supplier', atr ? 'Ask for the A.TR movement certificate' : 'Ask whether a trade agreement lowers the duty', atr
+          ? 'Türkiye and the EU form a customs union for industrial goods. With the certificate these goods enter free of duty.'
+          : (euD ? 'If the EU has an agreement with ' + origin + ', a statement on origin from the supplier can reduce the duty.'
+            : 'If ' + dest + ' has a trade agreement with ' + oAg + ', a proof of origin from the supplier can reduce the duty.'),
+          { ask: atr ? 'The A.TR movement certificate.' : (euD ? 'A statement on origin, if a trade agreement with the EU applies.' : 'A proof of origin, if a trade agreement with ' + dest + ' applies.') });
+      }
+    } else {
+      skipped.push('Customs: ' + (same ? 'the goods do not cross a border.' : (cu ? 'Switzerland and Liechtenstein form a customs union.' : origin + ' and ' + dest + ' are both in the EU.')));
+    }
+
+    /* Group 3: rules at destination */
+    var me = imp === 'You', IMPW = me ? 'You' : (euD ? 'EU importer' : 'Importer');
+    var adv = me ? 'a broker or adviser there' : 'the importer';
+    function labelItem(rule, extra) {
+      add(3, IMPW, 'Get a label for ' + dest, (me ? 'As importer you answer for the label.' : 'The importer answers for the label.') + ' It must follow ' + rule + (M.lang ? ' and be in ' + M.lang : '') + '.' + (extra ? ' ' + extra : '') + ' Agree who prints or relabels.');
+    }
+    function sdsItem(text, askLang) {
+      add(3, 'Supplier', 'Get a safety data sheet for ' + dest, text, { ask: 'A safety data sheet for ' + dest + (askLang ? ', in ' + askLang : '') + '.' });
+    }
+    function restricted() {
+      add(3, 'Supplier', 'Check for banned or restricted ingredients', 'Every market keeps its own lists of banned and restricted substances. Ask for a written statement for ' + dest + '.', { ask: 'A statement that no ingredient is banned or restricted in ' + dest + '.' });
+    }
+    function batteryMark(title, text) {
+      add(3, 'Supplier', title, text, { ask: 'Proof of the battery approval needed in ' + dest + '.' });
+      if (s.kind === 'device') add(3, 'Supplier', 'Check the device\'s own product rules', 'The device needs its own approval for ' + dest + '. This list covers the battery only.');
+    }
+    if (importer) {
+      if (!me) add(3, 'You and supplier', euD ? 'Settle who the EU importer is' : 'Settle who the importer is', euD
+        ? 'Under DDP the supplier clears customs, but someone established in the EU must still act as importer under chemical and product law. If nobody else is named, the duties below fall on you.'
+        : 'Under DDP the supplier clears customs, but a company in ' + dest + ' must still answer for the product under local chemical and product law. If nobody else is named, the duties below fall on you.', { first: true });
+      if (!lith && haz === 'no' && !areaD) skipped.push('Hazard label: the product carries no hazard pictograms.');
+
+      if (areaD && !lith) {
+        /* EU, and EEA countries, which apply EU chemical law */
+        var reach = euD ? 'in the EU' : 'under EU REACH, which also applies in ' + destN;
+        var orw = euD ? 'in the EU' : 'in the EU or EEA';
+        var impw = euD ? 'the EU importer' : 'the importer';
+        if (s.annual === 'ge') add(3, IMPW, 'Settle REACH registration', 'At 1 tonne or more a year, each substance in the product must be registered ' + reach + '. Ask whether an only representative of the supplier covers your tonnage. If not, the duty falls on ' + (me ? 'you as importer.' : impw + '.'), { first: true, ask: 'Whether an only representative ' + orw + ' covers REACH registration for our volume.' });
+        else if (s.annual === 'unknown') add(3, 'You', 'Estimate the yearly quantity', 'From 1 tonne a year per substance, REACH registration is required before import. Below that it is not.', { ask: 'Whether an only representative ' + orw + ' covers REACH registration.' });
+        else skipped.push('REACH registration: not needed below 1 tonne a year per substance. Keep a record of the quantity.');
+        if (haz !== 'no') {
+          add(3, IMPW, 'Get a label for ' + dest, (me ? 'As importer you answer for the label.' : 'The ' + (euD ? 'EU ' : '') + 'importer answers for the label.') + ' It must follow EU rules and be in ' + lang + '. Agree who prints or relabels.');
+          add(3, 'Supplier', 'Get a safety data sheet in the EU format', '16 sections, in ' + lang + '. A sheet written for another market is not enough.', { ask: 'A safety data sheet in the EU format, in ' + lang + '.' });
+          add(3, IMPW, 'Notify the classification to ECHA', 'Due within one month of the first import of a hazardous substance or mixture.');
+          add(3, IMPW, 'Check the poison-centre notification', 'Hazardous mixtures need a notification and a UFI code on the label before they are supplied or used in ' + dest + '.', { link: { href: 'https://poisoncentres.echa.europa.eu/', text: 'ECHA poison centres' } });
+        } else {
+          skipped.push('Hazard label, ECHA notification and poison-centre notification: the product carries no hazard pictograms.');
+        }
+        add(3, 'Supplier', 'Check for banned or restricted ingredients', 'Substances on the EU restriction and authorisation lists may not be imported or need a permit. Ask for a written statement.', { ask: 'A statement that no ingredient is on the REACH restriction or authorisation lists.' });
+        if (un === '1950') add(3, 'Supplier', 'Check the can meets EU aerosol rules', 'Aerosol cans supplied or used in the EU must follow the Aerosol Dispensers Directive, including its marking.');
+      } else if (euD) {
+        add(3, 'Supplier', 'Check the CE mark and the EU declaration of conformity', 'Both are required for batteries under the EU Batteries Regulation. ' + (me ? 'As importer you must hold the declaration.' : 'The EU importer must hold the declaration.'), { ask: 'The EU declaration of conformity for the battery and confirmation of the CE mark.' });
+        add(3, IMPW, me ? 'Put your name and address on the battery or its packaging' : 'Check the importer is named on the battery or its packaging', 'The importer must be identified on the product.');
+        add(3, IMPW, 'Settle take-back registration in ' + dest, 'Someone must be registered there as battery producer before the batteries are supplied. Ask whether the supplier has an authorised representative, or register yourself.', { ask: 'Whether you have an authorised representative for battery take-back in ' + dest + '.' });
+        if (s.kind === 'device') add(3, 'Supplier', 'Check the device\'s own EU product rules', 'The device needs its own CE conformity. This list covers the battery only.');
+      } else if (lith) {
+        if (mkt === 'CN') batteryMark('Check the CCC mark', 'Lithium-ion cells, battery packs and power banks for portable electronics may only be imported and sold in China with the CCC mark.');
+        else if (mkt === 'JP') batteryMark('Check the PSE mark', 'Lithium-ion batteries sold in Japan generally need the PSE mark under the electrical appliance safety law. Ask whether the battery carries it and who keeps the conformity records.');
+        else if (mkt === 'KR') batteryMark('Check the KC mark', 'Lithium batteries need Korean KC safety certification before they are sold. Ask whether the battery is certified and who holds the certificate.');
+        else if (mkt === 'IN') batteryMark('Check the BIS registration', 'Lithium cells and batteries need a registration with the Bureau of Indian Standards. Without it customs stops the goods.');
+        else batteryMark('Check the battery approval for ' + dest, 'Many countries want a national safety mark or registration for lithium batteries, and a take-back scheme. No battery rules are built in for ' + dest + ', so have ' + adv + ' confirm what applies.');
+      } else if (mkt === 'GB') {
+        if (s.annual === 'ge') add(3, IMPW, 'Settle UK REACH registration', 'At 1 tonne or more a year, each substance needs a UK REACH registration, held by the importer in Great Britain or by a UK-based only representative of the supplier. A registration in the EU does not count. Importers already in the transitional scheme have until October 2029 or later for the full dossier.', { first: true, ask: 'Whether a UK-based only representative covers UK REACH registration for our volume.' });
+        else if (s.annual === 'unknown') add(3, 'You', 'Estimate the yearly quantity', 'From 1 tonne a year per substance, UK REACH registration is required. Below that it is not.', { ask: 'Whether a UK-based only representative covers UK REACH registration.' });
+        else skipped.push('UK REACH registration: not needed below 1 tonne a year per substance. Keep a record of the quantity.');
+        if (haz !== 'no') {
+          labelItem('the GB CLP rules', 'Northern Ireland follows the EU rules instead.');
+          sdsItem('16 sections, in English, in the UK format. A sheet written for another market is not enough.', 'English');
+          skipped.push('Poison-centre notification: voluntary in Great Britain, and no UFI code is required.');
+          skipped.push('Classification notification to the authority: no longer required in Great Britain since 21 May 2026.');
+        }
+        restricted();
+      } else if (mkt === 'CH') {
+        if (haz !== 'no') {
+          add(3, IMPW, 'Report the product to the Swiss product register', 'Hazardous mixtures must be reported to the product register for chemicals (RPC) and carry a UFI code on the label. This has applied to all mixtures with health or physical hazards since 1 January 2026.', { link: { href: 'https://www.anmeldestelle.admin.ch/en/manufacturers-importers', text: 'Swiss notification authority' } });
+          labelItem('Swiss chemicals law', 'For many products it must also name a supplier in Switzerland.');
+          sdsItem('In the Swiss format and in the official language the buyer needs.', 'German, French or Italian');
+        }
+        restricted();
+        skipped.push('EU REACH registration: does not apply in Switzerland, which has its own rules for new substances.');
+      } else if (mkt === 'TR') {
+        if (s.annual !== 'lt') add(3, IMPW, 'Settle KKDIK registration', 'From 1 tonne a year, each substance needs a registration number in Türkiye\'s chemicals system KKDIK, held by the importer or by a Türkiye-based only representative of the supplier. Since 30 September 2026 a pre-registration is no longer enough.', { first: s.annual === 'ge', ask: 'Whether a Türkiye-based only representative covers KKDIK registration for our volume, with the registration numbers.' });
+        else skipped.push('KKDIK registration: not needed below 1 tonne a year per substance. Keep a record of the quantity.');
+        if (haz !== 'no') {
+          labelItem('the Turkish classification and labelling rules (SEA)');
+          sdsItem('In Turkish, prepared by a certified safety data sheet expert, as Turkish law requires.', 'Turkish, prepared by a certified expert');
+        }
+        restricted();
+      } else if (mkt === 'US') {
+        add(3, IMPW, 'Settle the TSCA certification', 'At entry the importer certifies that every chemical in the shipment complies with the US chemicals law TSCA, or is not subject to it. A substance that is not on the TSCA inventory needs clearance from the environment agency EPA first. Without the certification customs can refuse the goods.', { first: true, ask: 'Confirmation that all ingredients are on the active TSCA inventory, or a list of those that are not.', link: { href: 'https://www.epa.gov/node/77255', text: 'EPA: importing chemicals' } });
+        if (haz !== 'no') {
+          labelItem('the OSHA Hazard Communication Standard', 'It names the importer or another responsible party in the US.');
+          sdsItem('16 sections, in English, following the OSHA standard. Its 2024 update has been mandatory for substances since 19 May 2026 and applies to mixtures from 19 November 2027.', 'English, following the OSHA standard');
+        }
+        restricted();
+      } else if (mkt === 'CA') {
+        add(3, IMPW, 'Check the ingredients against Canada\'s substances list', 'A substance that is not on the Domestic Substances List is new to Canada. Above small yearly amounts the importer must notify the government before the import, 5 to 120 days ahead depending on the case.', { first: true, ask: 'Confirmation that all ingredients are on Canada\'s Domestic Substances List.' });
+        if (haz !== 'no') {
+          labelItem('the Hazardous Products Regulations (WHMIS)');
+          sdsItem('16 sections, in English and French, following the amended Canadian rules that have been mandatory since 15 December 2025.', 'English and French');
+        }
+        restricted();
+      } else if (mkt === 'MX') {
+        if (haz !== 'no') {
+          labelItem('the Mexican standard NOM-018-STPS-2015');
+          sdsItem('16 sections, in Spanish, following NOM-018-STPS-2015.', 'Spanish');
+        }
+        add(3, IMPW, 'Ask whether an import permit is needed', 'Mexico controls some chemicals, such as precursors and toxic substances, through permits from its health and environment authorities. Have the broker check your tariff code.');
+        restricted();
+      } else if (mkt === 'BR') {
+        if (s.annual !== 'lt') add(3, IMPW, 'Ask about registration under Brazil\'s chemicals law', 'Law 15.022 of 2024 makes importers register substances from 1 tonne a year in a national register that is still being set up. Have ' + adv + ' confirm whether registration is already open and due for your product.');
+        if (haz !== 'no') {
+          labelItem('the Brazilian standard ABNT NBR 14725');
+          sdsItem('16 sections, in Portuguese, following ABNT NBR 14725.', 'Portuguese');
+        }
+        restricted();
+      } else if (mkt === 'CN') {
+        add(3, IMPW, 'Check every ingredient is on China\'s chemical inventory', 'A substance that is not on the inventory IECSC needs a registration certificate before import, at any quantity. Since 24 October 2026 only a company in China can apply, so this falls on the importer.', { first: true, ask: 'Confirmation that all ingredients are listed in China\'s inventory of existing chemical substances (IECSC).' });
+        if (dg === 'yes' || haz !== 'no') {
+          add(3, IMPW, 'Prepare the customs file for hazardous chemicals', 'If the product is in China\'s catalogue of hazardous chemicals, customs inspects it at import. The importer hands in a declaration of conformity, the UN number, class and packing group, and samples of the Chinese hazard label and the Chinese safety data sheet.');
+          add(3, IMPW, 'Check the hazardous chemicals registration', 'Importers must register hazardous chemicals with the national registration agency. The duty is now set out in the Hazardous Chemicals Safety Law, in force since 1 May 2026.');
+          labelItem('the Chinese GB standards', 'It must be on the packages before they arrive.');
+          sdsItem('16 sections, in Chinese, following the Chinese GB standards.', 'Chinese');
+        }
+        restricted();
+      } else if (mkt === 'JP') {
+        add(3, IMPW, 'Check every ingredient against Japan\'s chemical lists', 'A substance that is not on the existing lists counts as new under the Chemical Substances Control Law and the Industrial Safety and Health Law. It must be notified, or cleared as low volume, before import.', { first: true, ask: 'Confirmation that all ingredients are existing substances in Japan (CSCL and ISHL lists).' });
+        if (haz !== 'no') {
+          labelItem('the Japanese standard JIS Z 7253');
+          sdsItem('In Japanese, following JIS Z 7253.', 'Japanese');
+        }
+        restricted();
+      } else if (mkt === 'KR') {
+        add(3, IMPW, 'Check K-REACH for every ingredient', 'New substances must be registered (from 1 tonne a year) or notified (below 1 tonne) before import. Existing substances need a registration from 1 tonne a year; pre-registered ones have until the end of 2027 (10 to 100 tonnes) or 2030 (1 to 10 tonnes). A Korean only representative of the supplier can take this on.', { first: s.annual === 'ge', ask: 'Whether a Korean only representative covers K-REACH for our volume.' });
+        if (haz !== 'no') {
+          add(3, IMPW, 'Have the Korean safety data sheet submitted before import', 'A safety data sheet in Korean must be submitted to the labour ministry\'s system (KOSHA) before the import. Only the Korean importer or a Korean only representative can submit it.', { ask: 'Your safety data sheet as the basis for the Korean version.' });
+          labelItem('the Korean hazard communication rules', 'It names a contact in Korea.');
+        }
+        restricted();
+      } else if (mkt === 'IN') {
+        if (dg === 'yes' || haz !== 'no') add(3, IMPW, 'Notify the import of hazardous chemicals', 'If the product is a listed hazardous chemical under India\'s MSIHC Rules, the importer must inform the authority at least 30 days before the import, or as early as possible, with port of entry, quantity and safety information.');
+        if (haz !== 'no') add(3, IMPW, 'Check what label and safety data sheet India requires', 'India has its own rules for hazardous chemicals. Have ' + adv + ' confirm what the label and the safety data sheet must show, and in which language.', { ask: 'Your safety data sheet in English.' });
+        restricted();
+      } else if (mkt === 'AU') {
+        add(3, IMPW, 'Register with AICIS before the first import', 'Any business that imports industrial chemicals, or products that contain them, must first register with the Australian scheme AICIS. There is no minimum quantity. Each chemical must also be put into one of the scheme\'s categories.', { first: true, link: { href: 'https://www.industrialchemicals.gov.au/node/213', text: 'AICIS: who must register' } });
+        if (haz !== 'no') {
+          labelItem('the Australian work health and safety rules (GHS 7)', 'It shows the name, address and phone number of the Australian importer.');
+          add(3, IMPW, 'Prepare an Australian safety data sheet', 'The importer must have a safety data sheet that meets Australian rules before the first import, with Australian contact details. The supplier\'s sheet is the starting point.', { ask: 'Your current safety data sheet in English.' });
+        }
+        restricted();
+      } else {
+        add(3, IMPW, 'Ask which chemical registrations apply in ' + dest, 'Many countries keep a chemical inventory or want a registration, notification or permit before the first import. No local rules are built in for ' + dest + ', so have ' + adv + ' confirm this before you order.', { first: true });
+        if (haz !== 'no') {
+          add(3, IMPW, 'Get a label for ' + dest, 'Most countries follow the UN system for hazard labels (GHS), each in its own version and language. Have ' + adv + ' confirm what the label must show.');
+          add(3, 'Supplier', 'Get a safety data sheet for ' + dest, 'Have ' + adv + ' confirm the format and language. A 16-section sheet in English is the usual starting point.', { ask: 'A 16-section safety data sheet in English, and in the local language if you have it.' });
+        }
+        restricted();
+      }
+    } else {
+      if (!lith && haz !== 'no' && !same) add(3, 'Supplier', 'Ask for label and safety data sheet in the local language', 'For ' + dest + ' that is ' + lang + '. Suppliers in the EU and EEA must provide both in the language of the country where the product is supplied.', { ask: 'Label and safety data sheet in ' + lang + '.' });
+      if (lith && !same) add(3, 'Supplier', 'Check take-back registration in ' + dest, 'Battery producers register per country. Ask who is registered in ' + dest + '.', { ask: 'Who is registered for battery take-back in ' + dest + '.' });
+      skipped.push(areaD ? 'Importer duties under EU chemical and product law: the supplier in ' + origin + ' already carries them.' : 'Importer duties under local chemical and product law: the supplier in ' + origin + ' already carries them.');
+    }
+    if (!lith && s.biocide) add(3, importer ? 'You' : 'Supplier', 'Check the biocide authorisation for ' + dest, 'Biocidal products need an authorisation before they are supplied or used. An approval in another country does not carry over automatically.' + (mkt === 'US' ? ' In the US, disinfectants and preservatives are registered with the EPA as pesticides.' : ''), { first: importer });
+    if (!lith && s.precursor) {
+      if (euD) add(3, 'You', 'Be ready to sign a customer statement', 'The product contains a regulated explosives precursor. Suppliers must verify who you are and what you use it for.');
+      else add(3, 'You', 'Check the rules for explosives precursors', 'The product contains a chemical that many countries control as an explosives precursor. Licences, customer checks or reporting can apply at origin and at destination. Ask both sides.');
+    }
+    if (dg === 'yes' || haz === 'yes') add(3, 'You', 'Check your own site is ready', lith ? 'Storage and charging of lithium batteries need fire precautions. Check your insurer\'s conditions.' : 'Storage limits, separation and staff instruction follow from sections 7 and 8 of the safety data sheet.');
+
+    /* Costs and deadlines */
+    if (dg === 'yes' && mode === 'sea') {
+      var prem = cls ? seaPremium(cls, un) : null;
+      est.push(['Carrier surcharge', !declared ? 'Up to about 300 USD per container if the carrier books it as dangerous goods' : (prem ? 'About ' + prem.toLocaleString('en-US') + ' USD per container' : 'On request for this class'), 'List price of one carrier, Hapag-Lloyd, December 2025. Others differ.']);
+      if (declared) est.push(['Waiting in port', 'Hamburg example: 1 free day, then 95 EUR a day for a hazardous 20-ft container', 'Normal cargo: 3 free days, then 70 EUR a day. ACL tariff 2026.' + (!s.poe || /hamburg/i.test(s.poe) ? '' : ' Ask the carrier for the tariff at ' + poe + '.')]);
+      est.push(['Wrong declaration', '15,000 USD per container', 'Fee charged by Hapag-Lloyd and ZIM for misdeclared dangerous goods.']);
+      if (declared) est.push(['Papers deadline', 'Final declaration 2 to 3 working days before the ship', 'ONE Europe: 2 working days before arrival. Hapag-Lloyd New Zealand: 3 working days before cut-off.']);
+    }
+    if (dg === 'yes' && express) {
+      var fee;
+      if (mode === 'air') fee = lith && s.kind === 'device' && small === true ? (s.fit === 'in' ? 'No surcharge for small batteries built into equipment' : 'About 5 EUR per shipment for small batteries packed with equipment') : 'About 100 EUR per shipment for fully regulated goods';
+      else if (lith) fee = 'Ask for the dangerous goods fee with the quote';
+      else fee = lqs === 'yes' ? 'About 25 EUR per shipment for limited quantities' : (lqs === 'no' ? 'About 100 EUR per shipment above limited quantities' : '25 to 100 EUR per shipment, depending on whether limited quantities apply');
+      est.push(['Express surcharge', fee, 'DHL Express list 2026, Luxembourg prices. Contract required.']);
+    } else if (dg === 'yes' && (mode === 'air' || mode === 'road' || mode === 'rail')) {
+      est.push(['Carrier surcharge', 'Ask for the dangerous goods fee with the quote', mode === 'air' ? 'Airlines and handling agents charge it per shipment, on top of the freight.' : 'Carriers charge it per consignment, on top of the freight.']);
+    }
+    if (border) {
+      if (euD) est.push(['Duty and import VAT', 'Duty by tariff code and origin, plus import VAT at the rate of ' + dest, hs.length >= 6 ? 'Use the Access2Markets link in the customs section.' : 'Enter the tariff code to get a direct lookup link.']);
+      else est.push(['Duty and import taxes', mkt === 'US' ? 'Duty by tariff code and origin, plus customs fees' : 'Duty by tariff code and origin, plus the import taxes of ' + dest, 'Use the lookup link in the customs section.']);
+      if (!secZone) {
+        if (euD) est.push(['Entry declaration', { sea: '24 hours before loading for deep-sea containers, later for short sea routes', road: 'At least 1 hour before the truck reaches the EU border', rail: 'At least 2 hours before the train reaches the EU border', air: 'Before loading, and again before arrival' }[mode], 'Filed by the carrier. It needs your data in time.']);
+        else est.push(['Cargo data to customs', { sea: 'About 24 hours before loading for most large markets', road: 'Before the truck reaches the border', rail: 'Before the train reaches the border', air: 'Before loading or before arrival, depending on the country' }[mode], 'Filed by the carrier. It needs your data in time.']);
+      }
+      if (mkt === 'US' && mode === 'sea') est.push(['Importer Security Filing', 'At least 24 hours before the container is loaded', 'Filed by the importer or its broker. 5,000 USD for a late, missing or wrong filing.']);
+    }
+    if (importer && !lith && areaD && haz !== 'no') est.push(['ECHA notification', 'Within 1 month of the first import', 'Classification and labelling notification by the importer.']);
+    if (importer && !lith && areaD && s.annual === 'ge') est.push(['REACH registration', 'Must be in place before you reach 1 tonne in a year', 'A project of its own if no only representative covers you. Get advice before ordering.']);
+    if (importer && !lith && mkt === 'CA') est.push(['New substance notice', '5 to 120 days before the import', 'Only if an ingredient is not on Canada\'s Domestic Substances List.']);
+    if (importer && !lith && mkt === 'CN') est.push(['New substance registration', 'Certificate in hand before the first import', 'Only if an ingredient is not on China\'s inventory.']);
+    if (importer && !lith && mkt === 'KR' && haz !== 'no') est.push(['Korean safety data sheet', 'Submitted before the import', 'By the Korean importer or an only representative.']);
+    if (importer && !lith && mkt === 'IN' && (dg === 'yes' || haz !== 'no')) est.push(['Import notice', 'At least 30 days before the import, where possible', 'For listed hazardous chemicals, by the importer.']);
+    if (!est.length) est.push(['No extra charges expected', 'Nothing beyond normal freight for this order', 'Based on the values entered.']);
+
+    /* Summary line and chips */
+    var line = (s.name ? s.name : (lith ? (s.kind === 'batt' ? 'Lithium battery' : 'Device with lithium battery') : 'Product')) + ', ' + route + ' ' + by + (s.term ? ', ' + s.term : '');
+    var chips = [];
+    chips.push(['Transport', dg === 'yes' ? (un ? 'UN ' + un : 'UN number open') + (cls ? ', class ' + cls : '') : (dg === 'no' ? 'not dangerous goods' : 'classification open')]);
+    if (lqs !== 'na' && mode !== 'air') chips.push(['Limited quantities', lqs === 'yes' ? 'yes' : (lqs === 'no' ? 'no' : 'open')]);
+    if (lith && small !== null) chips.push(['Battery', small ? 'small-battery rule' : 'fully regulated']);
+    chips.push(['Customs', border ? 'yes' : 'no']);
+    chips.push(['Importer duties', importer ? 'yes' : 'no']);
+    chips.push(['Local rules', mkt ? 'built in' : 'general only']);
+    var cover = mkt ? '' : 'No local rules are built in for ' + dest + '. The list shows the checks that apply on every route and what to confirm locally before you order.';
+
+    var recap = [['Product', s.name || 'not named'], ['Classification', chips[0][1]], ['From', originN], ['To', destN], ['Transport', by.replace('by ', '') + (express ? ', parcel or express' : '')], ['Delivery term', s.term || 'not agreed']];
+    if (mode === 'sea') recap.push(['Ports', pol + ' to ' + poe]);
+    if (mode === 'air' && (s.aol || s.aoe)) recap.push(['Airports', (s.aol || 'open') + ' to ' + (s.aoe || 'open')]);
+    if (hs) recap.push(['Tariff code', hs]);
+
+    /* Supplier message */
+    var seen = {}, list = asks.filter(function (a) { if (seen[a]) return false; seen[a] = 1; return true; });
+    var msg = 'Hi there,\n\nBefore we place the order for ' + P + ' (' + route + ' ' + by + (s.term ? ', ' + s.term : '') + '), could you send us the following?\n\n';
+    if (list.length) msg += list.map(function (a, i) { return (i + 1) + '. ' + a; }).join('\n');
+    else msg += 'Nothing is missing on our side. Please confirm the shipping date once the order is in.';
+    msg += '\n\nThat lets us sort out transport and customs up front, so nothing gets stuck on the way. Happy to jump on a quick call if that is easier.\n\nThanks a lot!';
+
+    return { items: items, skipped: skipped, est: est, line: line, chips: chips, recap: recap, msg: msg, cover: cover };
+  }
+
+  /* ---------- Rendering ---------- */
+  var GROUPS = ['Product and transport rules', 'Carrier and ports', 'Customs', 'Rules at destination'];
+  var done = {};
+  function itemNode(it) {
+    var row = mk('div', 'item' + (done[it.id] ? ' done' : ''));
+    var cb = mk('input');
+    cb.type = 'checkbox';
+    cb.id = 'i' + Math.abs(hash(it.id));
+    cb.checked = !!done[it.id];
+    cb.addEventListener('change', function () { done[it.id] = cb.checked; row.classList.toggle('done', cb.checked); progress(); });
+    var body = mk('div');
+    var t = mk('label', 'item-t', it.t);
+    t.htmlFor = cb.id;
+    body.appendChild(t);
+    body.appendChild(mk('div', 'item-d', it.d));
+    var m = mk('div', 'item-m');
+    m.appendChild(mk('span', 'who', it.who));
+    if (it.link) { var a = mk('a', null, it.link.text); a.href = it.link.href; a.target = '_blank'; a.rel = 'noopener'; m.appendChild(a); }
+    body.appendChild(m);
+    row.appendChild(cb);
+    row.appendChild(body);
+    return row;
+  }
+  function hash(str) { var h = 0, i; for (i = 0; i < str.length; i++) { h = ((h << 5) - h + str.charCodeAt(i)) | 0; } return h; }
+  var current = [];
+  function progress() {
+    var n = current.filter(function (it) { return done[it.id]; }).length;
+    $('#progress').textContent = current.length ? n + ' of ' + current.length + ' ticked off' : '';
+  }
+  function render() {
+    var s = read(), r = build(s);
+    visibility(s);
+    current = r.items;
+    $('#count').textContent = String(r.items.length);
+    $('#jump-n').textContent = String(r.items.length);
+    $('#line').textContent = r.line;
+    var cv = $('#cover'); cv.textContent = r.cover; cv.hidden = !r.cover;
+
+    var chips = $('#chips'); chips.textContent = '';
+    r.chips.forEach(function (c) { var e = mk('span', 'chip'); e.appendChild(document.createTextNode(c[0] + ': ')); e.appendChild(mk('b', null, c[1])); chips.appendChild(e); });
+
+    var firsts = r.items.filter(function (it) { return it.first; });
+    $('#first').hidden = !firsts.length;
+    var fl = $('#first-list'); fl.textContent = '';
+    firsts.forEach(function (it) { fl.appendChild(itemNode(it)); });
+
+    var groups = $('#groups'); groups.textContent = '';
+    GROUPS.forEach(function (name, g) {
+      var its = r.items.filter(function (it) { return it.g === g && !it.first; });
+      var all = r.items.filter(function (it) { return it.g === g; }).length;
+      var sec = mk('section', 'group');
+      var head = mk('div', 'group-head');
+      head.appendChild(mk('h3', null, name));
+      head.appendChild(mk('span', 'group-n', all === 0 ? 'nothing to do' : (all === 1 ? '1 item' : all + ' items')));
+      sec.appendChild(head);
+      if (!its.length) sec.appendChild(mk('div', 'empty', all ? 'See "Settle these first" above.' : 'Not needed for this order.'));
+      its.forEach(function (it) { sec.appendChild(itemNode(it)); });
+      groups.appendChild(sec);
+    });
+
+    $('#skipped').hidden = !r.skipped.length;
+    var sl = $('#skipped-list'); sl.textContent = '';
+    r.skipped.forEach(function (t) { sl.appendChild(mk('li', null, t)); });
+
+    var el = $('#est-list'); el.textContent = '';
+    r.est.forEach(function (e) {
+      var row = mk('div');
+      row.appendChild(mk('dt', null, e[0]));
+      var dd = mk('dd', null, e[1]);
+      dd.appendChild(mk('small', null, e[2]));
+      row.appendChild(dd);
+      el.appendChild(row);
+    });
+
+    $('#msg').textContent = r.msg;
+
+    var rc = $('#recap'); rc.textContent = '';
+    r.recap.forEach(function (p) { var d = mk('div'); d.appendChild(mk('dt', null, p[0] + ':')); d.appendChild(mk('dd', null, p[1])); rc.appendChild(d); });
+
+    progress();
+  }
+  function visibility(s) {
+    var lith = s.kind !== 'chem', border = s.origin !== s.dest && !(EU[s.origin] && EU[s.dest]) && !((s.origin === 'CH' && s.dest === 'LI') || (s.origin === 'LI' && s.dest === 'CH'));
+    var show = {
+      chem: !lith, 'chem-dg': !lith && s.dg === 'yes', lith: lith, device: s.kind === 'device',
+      sea: s.mode === 'sea', air: s.mode === 'air', service: s.mode === 'road' || s.mode === 'air', border: border
+    };
+    $$('[data-show]').forEach(function (e) { e.hidden = !show[e.getAttribute('data-show')]; });
+    $('#imp-legend').textContent = 'Are you registered as an importer in ' + (THE[s.dest] ? 'the ' : '') + (NAME[s.dest] || 'the destination country') + '?';
+    $('#imp-hint').textContent = EU[s.dest] ? 'An EORI number, the customs ID every EU importer needs.' : ((MARKET[s.dest] || {}).hint || 'A customs or tax ID for importers. A broker can tell you which one.');
+    $('#un-warn').hidden = !(show['chem-dg'] && s.un !== '' && !/^\d{4}$/.test(s.un));
+    var metal = s.chem === 'metal';
+    $('#wh-label').textContent = metal ? 'Lithium content per battery, in grams' : 'Watt-hours per battery';
+    $('#wh-hint').textContent = metal ? 'Stated in the battery data sheet.' : 'Printed on the battery. Volts times amp-hours gives watt-hours.';
+  }
+
+  /* ---------- Wiring ---------- */
+  function fillSelect(sel, pairs) { pairs.forEach(function (p) { var o = mk('option', null, p[1]); o.value = p[0]; sel.appendChild(o); }); }
+  fillSelect($('#f-origin'), Object.keys(NAME).map(function (k) { return [k, NAME[k]]; }).sort(function (a, b) { return a[1].localeCompare(b[1]); }));
+  fillSelect($('#f-dest'), Object.keys(NAME).map(function (k) { return [k, NAME[k]]; }).sort(function (a, b) { return a[1].localeCompare(b[1]); }));
+
+  $('#form').addEventListener('input', function () { $('#note-text').textContent = 'The list updates as you type.'; render(); });
+  $('#form').addEventListener('change', render);
+  $$('[data-preset]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var s = read(), p = PRESET[b.getAttribute('data-preset')], k;
+      for (k in p) { if (Object.prototype.hasOwnProperty.call(p, k)) s[k] = p[k]; }
+      write(s); render();
+    });
+  });
+  $('#btn-clear').addEventListener('click', function () { done = {}; write(BLANK); $('#note-text').textContent = 'Form cleared. Start with the product.'; render(); $('#f-name').focus(); });
+
+  $('#btn-copy').addEventListener('click', function () {
+    var text = $('#msg').textContent, st = $('#status');
+    function ok() { st.textContent = 'Message copied.'; }
+    function fallback() {
+      var ta = mk('textarea'); ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      var good = false;
+      try { good = document.execCommand('copy'); } catch (e) { good = false; }
+      document.body.removeChild(ta);
+      if (good) ok();
+      else {
+        var range = document.createRange(); range.selectNodeContents($('#msg'));
+        var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+        st.textContent = 'Message selected. Press Ctrl+C or Cmd+C to copy.';
+      }
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(ok, fallback);
+    else fallback();
+  });
+  $('#btn-print').addEventListener('click', function () {
+    var framed = false;
+    try { framed = window.self !== window.top; } catch (e) { framed = true; }
+    if (framed) { $('#status').textContent = 'Open this file in your browser to print it or save it as PDF.'; }
+    try { window.print(); } catch (e) { $('#status').textContent = 'Open this file in your browser to print it or save it as PDF.'; }
+  });
+
+  $('#jump').addEventListener('click', function (ev) { ev.preventDefault(); $('#result').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+
+  write(EXAMPLE);
+  render();
+})();
+</script>
+</body>
+</html>
